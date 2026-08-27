@@ -11,3 +11,6 @@ services:
       - .env
     environment:
       - PORT=3000
+    volumes:
+      - ./gateway.db:/app/gateway.db
+      - ./.GOPAY_SESI_JANGAN_DIHAPUS.json:/app/.GOPAY_SESI_JANGAN_DIHAPUS.json
