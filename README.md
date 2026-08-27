@@ -10,28 +10,13 @@
   <img src="https://img.shields.io/badge/Deploy-VPS%20%7C%20Docker%20%7C%20cPanel-orange" alt="Deploy Options" />
 </p>
 
-<p align="center">
-  <a href="https://t.me/ahmadzakiyo">
-    <img src="https://img.shields.io/badge/Telegram-Chat%20Owner-2CA5E0?logo=telegram&logoColor=white&style=for-the-badge" alt="Chat Owner" />
-  </a>
-  &nbsp;
-  <a href="https://t.me/nuxysproject">
-    <img src="https://img.shields.io/badge/Telegram-Channel%20Updates-2CA5E0?logo=telegram&logoColor=white&style=for-the-badge" alt="Channel" />
-  </a>
-</p>
-
-API Gateway self-hosted berbasis Node.js & SQLite untuk otomatisasi cek transaksi, cetak QRIS dinamis, notifikasi webhook otomatis, dan manajemen sesi GoBiz Merchant.
+API Gateway self-hosted berbasis Node.js & SQLite untuk otomatisasi cek transaksi, cetak QRIS dinamis, notifikasi webhook otomatis, manajemen sesi GoBiz Merchant, serta **Admin Control Panel UI** modern dengan **Live System Log Monitor**.
 
 ---
 
-> [!NOTE]
-> 💬 **HUBUNGI OWNER & BERGABUNG CHANNEL:**
-> - 👤 **Developer / Owner:** [@ahmadzakiyo](https://t.me/ahmadzakiyo)
-> - 📢 **Channel Update & Project:** [@nuxysproject](https://t.me/nuxysproject)
-
 > [!TIP]
-> 📣 **PENGUMUMAN & UPDATE TERBARU: Web Dashboard Login, Webhook Queue, & Kode Unik 24 Jam**
-> Gateway ini kini dilengkapi dengan **Dashboard Web UI Login (`/login`)**, **Masa Karantina Kode Unik 24 Jam**, **Database SQLite (`gateway.db`)**, serta **Background Webhook Queue Worker dengan Retry Otomatis (3x)**!
+> 📣 **UPDATE TERBARU: Modern Admin Control Panel, Live System Log Monitor & Strict API Access Security**
+> Gateway ini dilengkapi dengan **Dashboard Control Panel dengan Navigasi Sidebar**, **Live Terminal System Logs Monitor (`/api/logs`)**, **Pemisahan Ketat Akses Admin (`ADMIN_PASSWORD`) vs Client (`APP_SECRET`)**, serta **Background Webhook Queue Worker dengan Retry Otomatis (3x)**!
 
 > [!CAUTION]
 > 🚨 **PERSYARATAN DEPLOYMENT (VPS / cPanel / Docker)**
@@ -42,18 +27,19 @@ API Gateway self-hosted berbasis Node.js & SQLite untuk otomatisasi cek transaks
 
 ## ✨ Fitur Utama
 
-- 🔐 **Web UI & REST API Login GoBiz** — Login via browser HP/Laptop di `http://localhost:3000/login` atau REST API. Bebas dari login terminal!
-- 🔒 **Proteksi Lock Screen Password Admin (`ADMIN_PASSWORD`)** — Pengunjung publik di VPS tidak bisa melihat status atau menekan tombol logout tanpa password admin.
+- 💻 **Modern Admin Control Panel UI (`/login`)** — Antarmuka dashboard panel dengan navigasi sidebar kiri, top status bar, kartu statistik KPI, dan modal interaktif.
+- 📺 **Live System Log Monitor (`/api/logs`)** — Konsol terminal live real-time di Admin Panel untuk memantau log aktivitas background worker (Reconciler, Webhook Queue, Session Keep-Alive), API request, dan error.
+- 🔒 **Proteksi Akses Keamanan Ketat (`ADMIN_PASSWORD` vs `APP_SECRET`)** — Pemisahan hak akses penuh Admin (`ADMIN_PASSWORD`) dan kunci aplikasi klien (`APP_SECRET`). Mencegah privilege escalation dari pihak ketiga.
+- 🚪 **Logout Admin Portal vs Hapus Sesi GoPay** — Pemisahan yang jelas antara keluar dari halaman web portal admin (`lockPortalAdmin`) dan memutuskan sesi merchant GoPay (`logoutSession`).
 - 🗄️ **Database SQLite Permanen (`gateway.db`)** — Operasi dalam mode WAL (Write-Ahead Logging). Riwayat order & klaim pembayaran tersimpan utuh walau server di-restart.
 - 🔢 **Kode Unik Kecil (1–99 Rp) dengan Karantina 24 Jam** — 100% bebas konflik & anti-tertukar. Kode unik dikarantina 24 jam per nominal dasar.
 - ⚡ **Cache Mutasi 10 Detik & Single-Flight Debouncing** — Panggilan ke GoJek API dibatasi maksimal 1x per 10 detik (~6x/menit), bebas dari rate limit & anti-banned.
 - ⏰ **Proteksi Expiry Window + Grace Period (+2 Menit)** — Transaksi telat (>5m) diabaikan agar tidak salah masuk ke order pembeli baru.
 - 🧾 **QRIS Dinamis (EMVCo) & Gambar Base64 (`qris_image_base64`)** — Mengembalikan string EMVCo, URL checkout, gambar PNG, dan Data URI Base64 siap pakai.
 - 🤖 **Background Auto-Reconciler Worker** — Secara otomatis mencocokkan transaksi tanpa pemilik (`qris_id: null`) dengan order `PENDING` di background setiap 5 detik tanpa perlu user refresh web!
-- 🛠️ **Validasi Manual Admin (`/api/orders/manual-claim`)** — Memungkinkan Admin memvalidasi order `PENDING`/`EXPIRED` menjadi `PAID` secara manual lewat Dashboard Admin dan otomatis memicu pengiriman Webhook!
+- 🛠️ **Validasi Manual Admin & Jodohkan Transaksi** — Memungkinkan Admin memvalidasi order `PENDING`/`EXPIRED` atau menjodohkan ID transaksi GoJek secara manual lewat Dashboard Admin dan otomatis memicu pengiriman Webhook.
 - 🔔 **Background Webhook Queue Worker dengan Retry Engine (3x)** — Mengirim notifikasi HTTP POST otomatis ke Pihak Ketiga saat status `PAID` dengan percobaan ulang 3x jika server Pihak Ketiga sempat down.
 - 🔖 **ID Transaksi Pihak Ketiga (`client_ref_id`)** — Menyimpan ID Invoice Pihak Ketiga dan mengembalikannya pada notifikasi Webhook.
-- 📱 **Halaman Checkout Interaktif** — Tampilan modern dengan timer 5 menit, tombol cek status manual, & auto-polling opsional.
 
 ---
 
@@ -87,7 +73,7 @@ Headers (opsional jika dikirim via Header):
 {
   "app_id": "App1",
   "app_secret": "secret123",
-  "amount": 1000,
+  "amount": 10000,
   "ref_id": "INV-20260826-0001",
   "webhook_url": "https://pihak-ketiga.com/callback"
 }
@@ -102,9 +88,9 @@ Headers (opsional jika dikirim via Header):
     "trx_id": "TRX-4UR9CRCC",
     "app_id": "App1",
     "client_ref_id": "INV-20260826-0001",
-    "base_amount": 1000,
-    "unique_code": 1,
-    "amount": 1001,
+    "base_amount": 10000,
+    "unique_code": 14,
+    "amount": 10014,
     "qris_string": "000201010212...",
     "qris_image_url": "http://localhost:3000/qr/QR-9C6TS3RC.png",
     "qris_image_base64": "data:image/png;base64,iVBORw0KG...",
@@ -130,8 +116,8 @@ Headers (opsional jika dikirim via Header):
   "transaction": {
     "transaction_id": "01a03c85-...",
     "order_id": "QRIS-042026...",
-    "amount": 1033,
-    "payer_issuer": "AIRPAY SHOPEE",
+    "amount": 10014,
+    "payer_issuer": "GoPay / Bank",
     "payment_type": "QRIS",
     "transaction_time": "2026-08-26T14:00:15+07:00"
   }
@@ -144,18 +130,18 @@ Headers (opsional jika dikirim via Header):
 ```json
 {
   "event": "payment.success",
-  "qris_id": "mye5ns9i",
-  "trx_id": "TRX-R1DW2GJS",
+  "qris_id": "QR-9C6TS3RC",
+  "trx_id": "TRX-4UR9CRCC",
   "client_ref_id": "INV-20260826-0001",
   "status": "PAID",
-  "amount": 1033,
-  "base_amount": 1000,
-  "unique_code": 33,
+  "amount": 10014,
+  "base_amount": 10000,
+  "unique_code": 14,
   "transaction": {
     "transaction_id": "01a03c85-...",
     "order_id": "QRIS-042026...",
-    "amount": 1033,
-    "payer_issuer": "AIRPAY SHOPEE",
+    "amount": 10014,
+    "payer_issuer": "GoPay / Bank",
     "payment_type": "QRIS",
     "transaction_time": "2026-08-26T14:00:15+07:00"
   }
@@ -164,22 +150,10 @@ Headers (opsional jika dikirim via Header):
 
 ---
 
-### 4. Reset / Hapus Seluruh Data Order QRIS (`POST` / `GET` / `DELETE /api/orders/clear`)
-Headers: `x-api-key: secret123`
-Menghapus seluruh riwayat order QRIS, klaim transaksi, dan antrian webhook di database SQLite.
-```json
-{
-  "success": true,
-  "message": "Seluruh data order QRIS berhasil dihapus dari database!"
-}
-```
-
----
-
-### 5. Manajemen Login GoBiz via Browser (`http://localhost:3000/login`)
+### 4. Manajemen Admin Panel (`http://localhost:3000/login`)
 - **Layar Kunci**: Masukkan `ADMIN_PASSWORD` (default: `admin123456`).
-- **Input Nomor HP**: Kirim OTP SMS/WA.
-- **Input OTP**: Verifikasi OTP & Sesi Aktif!
+- **Sidebar Navigation**: Akses Order QRIS, Sesi GoBiz, Antrian Webhook, Mutasi GoJek, Live System Logs, & Docs API.
+- **Input Nomor HP & OTP**: Aktivasi Sesi GoBiz Merchant secara langsung via Web UI.
 
 ---
 
