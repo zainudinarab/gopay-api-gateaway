@@ -1,0 +1,1356 @@
+// Views - Admin Portal Dashboard HTML Generator (Modern Admin Panel UI)
+const fs = require('fs');
+const path = require('path');
+
+function renderAdminDashboard(sessionExists) {
+    return `<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - GoPay Merchant Gateway</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-body: #0b0f19;
+            --bg-sidebar: #111827;
+            --bg-card: #1f2937;
+            --bg-card-hover: #263346;
+            --bg-input: #0d131f;
+            --border-color: #374151;
+            --border-focus: #0284c7;
+            --text-main: #f9fafb;
+            --text-muted: #9ca3af;
+            --text-dim: #6b7280;
+            --accent-blue: #0284c7;
+            --accent-cyan: #38bdf8;
+            --accent-green: #22c55e;
+            --accent-amber: #f59e0b;
+            --accent-red: #ef4444;
+            --accent-purple: #a855f7;
+            --glow-cyan: rgba(56, 189, 248, 0.15);
+            --shadow-card: 0 10px 30px -5px rgba(0, 0, 0, 0.5);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
+        
+        body {
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            overflow-x: hidden;
+        }
+
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-body); }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+
+        /* Lock Screen Centered Mode */
+        .lock-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle at center, rgba(2, 132, 199, 0.12) 0%, transparent 70%), var(--bg-body);
+            padding: 20px;
+        }
+
+        .lock-card {
+            background: rgba(31, 41, 55, 0.85);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            width: 100%;
+            max-width: 440px;
+            padding: 40px 32px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+            text-align: center;
+            animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(16px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Admin Panel Main Layout */
+        .admin-layout {
+            display: none;
+            width: 100vw;
+            min-height: 100vh;
+        }
+
+        .admin-layout.active {
+            display: flex;
+        }
+
+        /* Sidebar Navigation */
+        .sidebar {
+            width: 280px;
+            background: var(--bg-sidebar);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            top: 0; bottom: 0; left: 0;
+            z-index: 100;
+        }
+
+        .sidebar-brand {
+            padding: 24px 20px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .brand-icon {
+            width: 44px; height: 44px;
+            background: linear-gradient(135deg, rgba(2, 132, 199, 0.2), rgba(56, 189, 248, 0.1));
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            color: var(--accent-cyan);
+            box-shadow: 0 0 15px var(--glow-cyan);
+        }
+
+        .brand-title {
+            font-size: 16px;
+            font-weight: 800;
+            color: #ffffff;
+            letter-spacing: -0.3px;
+        }
+
+        .brand-badge {
+            display: inline-block;
+            font-size: 10px;
+            font-weight: 700;
+            background: rgba(34, 197, 94, 0.15);
+            color: var(--accent-green);
+            padding: 2px 6px;
+            border-radius: 6px;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
+        .sidebar-menu {
+            padding: 20px 12px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            overflow-y: auto;
+        }
+
+        .menu-label {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-dim);
+            padding: 8px 12px;
+            margin-top: 8px;
+        }
+
+        .tab-btn {
+            width: 100%;
+            background: transparent;
+            border: 1px solid transparent;
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 14px;
+            padding: 12px 14px;
+            border-radius: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            text-align: left;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .tab-btn.active {
+            color: var(--accent-cyan);
+            background: linear-gradient(90deg, rgba(2, 132, 199, 0.15), rgba(56, 189, 248, 0.05));
+            border-color: rgba(56, 189, 248, 0.25);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .sidebar-footer {
+            padding: 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        /* Main Workspace Content Area */
+        .main-content {
+            margin-left: 280px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .top-header {
+            height: 72px;
+            background: rgba(17, 24, 39, 0.8);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0 32px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 90;
+        }
+
+        .header-title h2 { font-size: 18px; font-weight: 700; color: #fff; }
+        .header-title p { font-size: 12.5px; color: var(--text-muted); }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .system-pill {
+            display: flex; align-items: center; gap: 8px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .status-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            box-shadow: 0 0 10px var(--accent-green);
+        }
+
+        .content-body {
+            padding: 32px;
+            flex: 1;
+        }
+
+        /* KPI Stat Cards Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            margin-bottom: 28px;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: var(--shadow-card);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(56, 189, 248, 0.4);
+        }
+
+        .stat-icon {
+            width: 40px; height: 40px;
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            margin-bottom: 14px;
+        }
+
+        .stat-label { font-size: 12.5px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px; }
+        .stat-val { font-size: 24px; font-weight: 800; color: #fff; letter-spacing: -0.5px; }
+
+        /* Form Components */
+        .form-group { text-align: left; margin-bottom: 20px; }
+        label { display: block; font-size: 13px; font-weight: 600; color: #d1d5db; margin-bottom: 8px; }
+        
+        input[type="text"], input[type="password"] {
+            width: 100%;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 14px 16px;
+            color: var(--text-main);
+            font-size: 14px;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        input[type="text"]:focus, input[type="password"]:focus {
+            border-color: var(--border-focus);
+            box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.25);
+        }
+
+        /* Buttons */
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-blue), #0369a1);
+            color: #ffffff;
+            border: none;
+            font-weight: 600;
+            font-size: 13.5px;
+            padding: 12px 20px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(2, 132, 199, 0.5);
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--accent-red);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            box-shadow: none;
+        }
+
+        .btn-danger:hover {
+            background: rgba(239, 68, 68, 0.25);
+            box-shadow: 0 4px 14px rgba(239, 68, 68, 0.3);
+        }
+
+        .btn-sm {
+            padding: 8px 14px;
+            font-size: 12.5px;
+            border-radius: 8px;
+        }
+
+        .spinner {
+            width: 16px; height: 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: none;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Alerts */
+        .alert {
+            display: none;
+            font-size: 13.5px;
+            padding: 14px 18px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            text-align: left;
+            animation: fadeIn 0.3s;
+        }
+        .alert-success { background: rgba(34, 197, 94, 0.12); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); }
+        .alert-error { background: rgba(239, 68, 68, 0.12); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+
+        /* Status Badge */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            font-size: 14px;
+            padding: 12px 20px;
+            border-radius: 14px;
+            margin-bottom: 24px;
+        }
+        .status-active { background: rgba(34, 197, 94, 0.12); color: var(--accent-green); border: 1px solid rgba(34, 197, 94, 0.3); }
+        .status-inactive { background: rgba(239, 68, 68, 0.12); color: var(--accent-red); border: 1px solid rgba(239, 68, 68, 0.3); }
+
+        /* Tab Contents */
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+
+        /* Panel Container */
+        .panel-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 28px;
+            box-shadow: var(--shadow-card);
+            margin-bottom: 28px;
+        }
+
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        /* Tables */
+        .table-responsive {
+            overflow-x: auto;
+            max-height: 520px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            background: #111827;
+        }
+
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+        
+        th {
+            background: #1f2937;
+            color: var(--text-muted);
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.5px;
+            padding: 14px 16px;
+            position: sticky; top: 0; z-index: 2;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        td {
+            padding: 14px 16px;
+            border-bottom: 1px solid #1f2937;
+            color: #d1d5db;
+            vertical-align: middle;
+        }
+
+        tr:nth-child(even) td { background: rgba(17, 24, 39, 0.5); }
+        tr:hover td { background: rgba(56, 189, 248, 0.06); }
+
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 11px;
+            letter-spacing: 0.3px;
+        }
+
+        .tag-paid, .tag-success { background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); }
+        .tag-pending { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
+        .tag-failed, .tag-expired { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+
+        code, pre { font-family: 'JetBrains Mono', monospace; }
+
+        /* Responsive Breakpoints */
+        @media (max-width: 992px) {
+            .sidebar { width: 220px; }
+            .main-content { margin-left: 220px; }
+        }
+
+        @media (max-width: 768px) {
+            .admin-layout.active { flex-direction: column; }
+            .sidebar { width: 100%; position: relative; height: auto; border-right: none; border-bottom: 1px solid var(--border-color); }
+            .main-content { margin-left: 0; }
+            .top-header { padding: 0 16px; }
+            .content-body { padding: 16px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Section 1: Lock Screen Password Admin (Centred Glassmorphic Screen) -->
+    <div class="lock-container" id="section-admin-lock">
+        <div class="lock-card">
+            <div class="brand-icon" style="margin: 0 auto 20px; width: 64px; height: 64px;">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            </div>
+            <h2 style="font-size: 22px; font-weight: 800; margin-bottom: 8px;">Admin Control Portal</h2>
+            <p style="font-size: 13.5px; color: var(--text-muted); margin-bottom: 28px;">Masukkan Password Admin di file <code>.env</code> untuk membuka portal kontrol gateway GoPay.</p>
+
+            <div class="alert alert-error" id="msg-error" style="display:none;"></div>
+            <div class="alert alert-success" id="msg-success" style="display:none;"></div>
+
+            <div class="form-group">
+                <label for="inp-admin-pass">🔒 Password Admin Gateway</label>
+                <input type="password" id="inp-admin-pass" placeholder="Password Admin di .env..." onkeyup="if(event.key==='Enter') unlockAdmin()">
+            </div>
+            
+            <button class="btn-primary" id="btn-unlock" onclick="unlockAdmin()" style="width: 100%; padding: 14px;">
+                <span class="spinner" id="spin-lock"></span>
+                <span id="lbl-lock">🔑 Masuk ke Portal Admin</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Section 2: Dashboard Control Panel (Sidebar + Workspace Layout) -->
+    <div class="admin-layout" id="section-dashboard">
+        
+        <!-- Sidebar Navigation Menu -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                </div>
+                <div>
+                    <div class="brand-title">GoPay Gateway</div>
+                    <span class="brand-badge">SQLite WAL</span>
+                </div>
+            </div>
+
+            <nav class="sidebar-menu">
+                <div class="menu-label">Menu Utama</div>
+                
+                <button class="tab-btn active" data-tab="orders" onclick="switchTabByName('orders', event)">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                    🧾 Order QRIS
+                </button>
+                
+                <button class="tab-btn" data-tab="auth" onclick="switchTabByName('auth', event)">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                    🔐 Sesi GoBiz
+                </button>
+                
+                <button class="tab-btn" data-tab="webhooks" onclick="switchTabByName('webhooks', event)">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                    🔔 Antrian Webhook
+                </button>
+
+                <button class="tab-btn" data-tab="tx" onclick="switchTabByName('tx', event)">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                    💸 Mutasi GoJek
+                </button>
+
+                <div class="menu-label">Pengembang</div>
+
+                <button class="tab-btn" data-tab="logs" onclick="switchTabByName('logs', event)">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+                    💻 Live System Logs
+                </button>
+                
+                <button class="tab-btn" data-tab="docs" onclick="switchTabByName('docs', event)">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                    📖 Dokumentasi API
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button class="btn-primary btn-danger" style="width: 100%; justify-content: center; font-size: 13px;" onclick="lockPortalAdmin()">
+                    🚪 Logout Admin Portal
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Workspace Area -->
+        <main class="main-content">
+            <!-- Top Header Bar -->
+            <header class="top-header">
+                <div class="header-title">
+                    <h2 id="header-page-title">Order QRIS</h2>
+                    <p id="header-page-subtitle">Kelola dan pantau seluruh transaksi QRIS yang diterbitkan.</p>
+                </div>
+                
+                <div class="header-actions">
+                    <div class="system-pill">
+                        <span class="status-dot"></span>
+                        <span>Reconciler & Webhook Active</span>
+                    </div>
+                    <button class="btn-primary btn-sm" onclick="refreshCurrentTab()" style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: var(--text-main);">
+                        🔄 Sync Data
+                    </button>
+                    <button class="btn-primary btn-sm btn-danger" onclick="lockPortalAdmin()" title="Keluar dan kunci halaman portal admin">
+                        🚪 Logout Admin
+                    </button>
+                </div>
+            </header>
+
+            <!-- Main Body Workspace -->
+            <div class="content-body">
+                
+                <!-- KPI Stat Cards Overview -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: rgba(56, 189, 248, 0.15); color: var(--accent-cyan);">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                        </div>
+                        <div class="stat-label">Total Mutasi GoJek</div>
+                        <div class="stat-val" id="val-total-tx" style="color: var(--accent-cyan);">Rp 0</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: rgba(34, 197, 94, 0.15); color: var(--accent-green);">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                        </div>
+                        <div class="stat-label">Sesi Merchant GoPay</div>
+                        <div class="stat-val" style="font-size: 16px; color: ${sessionExists ? 'var(--accent-green)' : 'var(--accent-red)'};">
+                            ${sessionExists ? '🟢 Sesi Aktif' : '🔴 Belum Aktivasi'}
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: rgba(168, 85, 247, 0.15); color: var(--accent-purple);">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                        </div>
+                        <div class="stat-label">Antrian Webhook Worker</div>
+                        <div class="stat-val" style="font-size: 16px; color: var(--accent-purple);">5s Auto-Retry</div>
+                    </div>
+                </div>
+
+                <!-- Tab 1: Sesi & Login GoBiz -->
+                <div class="tab-content" id="tab-auth">
+                    <div class="panel-card">
+                        <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 16px;">🔐 Status & Konfigurasi Sesi GoBiz Merchant</h3>
+                        
+                        <div class="status-badge ${sessionExists ? 'status-active' : 'status-inactive'}" id="session-badge">
+                            <span id="status-icon">${sessionExists ? '🟢' : '🔴'}</span>
+                            <span id="status-text">${sessionExists ? 'Sesi GoPay Merchant Aktif & Siap Menerima Order' : 'Sesi GoPay Merchant Belum Dikonfigurasi'}</span>
+                        </div>
+
+                        ${sessionExists ? `
+                        <div id="logged-in-box" style="padding: 12px 0;">
+                            <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 24px; line-height: 1.6;">
+                                Sesi login GoBiz Merchant Anda saat ini aktif dan tersimpan secara permanen di server. Background Reconciler Worker siap mencocokkan pembayaran QRIS otomatis 24/7.
+                            </p>
+                            <button class="btn-primary btn-danger" onclick="logoutSession()" style="background: rgba(239,68,68,0.2); border: 1px solid rgba(239,68,68,0.4);">
+                                🗑️ Hapus / Putuskan Sesi Login GoPay Merchant
+                            </button>
+                        </div>
+                        ` : `
+                        <div id="step-1" style="max-width: 480px;">
+                            <p style="font-size: 13.5px; color: var(--text-muted); margin-bottom: 20px;">
+                                Masukkan nomor HP yang terdaftar di aplikasi GoBiz untuk menerima Kode OTP via SMS / Whatsapp.
+                            </p>
+                            <div class="form-group">
+                                <label for="inp-phone">Nomor HP GoBiz / GoFood Merchant</label>
+                                <input type="text" id="inp-phone" placeholder="Contoh: 08123456789 atau 0851...">
+                            </div>
+                            <button class="btn-primary" id="btn-otp" onclick="requestOTP()">
+                                <span class="spinner" id="spin-1"></span>
+                                <span id="lbl-1">📱 Kirim Kode OTP (SMS/WA)</span>
+                            </button>
+                        </div>
+
+                        <div id="step-2" style="display: none; max-width: 480px;">
+                            <p style="font-size: 13.5px; color: var(--text-muted); margin-bottom: 20px;">
+                                Masukkan 4 digit kode OTP yang diterima di HP Anda.
+                            </p>
+                            <div class="form-group">
+                                <label for="inp-otp">Kode OTP GoBiz (4 Digit)</label>
+                                <input type="text" id="inp-otp" placeholder="____" maxlength="6" style="letter-spacing: 6px; text-align: center; font-size: 24px; font-weight: 800;">
+                            </div>
+                            <button class="btn-primary" id="btn-verify" onclick="verifyOTP()">
+                                <span class="spinner" id="spin-2"></span>
+                                <span id="lbl-2">✅ Verifikasi & Aktifkan Sesi</span>
+                            </button>
+                        </div>
+                        `}
+                    </div>
+                </div>
+
+                <!-- Tab 2: Daftar Order QRIS (Active Default) -->
+                <div class="tab-content active" id="tab-orders">
+                    <div class="panel-card">
+                        <div class="toolbar">
+                            <div>
+                                <h3 style="font-size: 18px; font-weight: 700;">🧾 Riwayat Order QRIS Dinamis</h3>
+                                <p style="font-size: 13px; color: var(--text-muted);">Menampilkan order QRIS dinamis beserta kode unik & status pembayaran.</p>
+                            </div>
+                            <div style="display: flex; gap: 10px;">
+                                <button class="btn-primary btn-sm" onclick="loadOrdersTable()">🔄 Refresh Orders</button>
+                                <button class="btn-primary btn-sm btn-danger" onclick="clearAllOrders()">🗑️ Reset Database Order</button>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>QRIS ID</th>
+                                        <th>App ID</th>
+                                        <th>Ref ID</th>
+                                        <th>Nominal Akhir</th>
+                                        <th>Status Order</th>
+                                        <th>Status Webhook</th>
+                                        <th>Dibuat Pada</th>
+                                        <th>Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody-orders">
+                                    <tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Memuat data order...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 3: Status Antrian Webhook -->
+                <div class="tab-content" id="tab-webhooks">
+                    <div class="panel-card">
+                        <div class="toolbar">
+                            <div>
+                                <h3 style="font-size: 18px; font-weight: 700;">🔔 Log Antrian Webhook Delivery</h3>
+                                <p style="font-size: 13px; color: var(--text-muted);">Status pengiriman notifikasi HTTP POST ke server Pihak Ketiga (Auto Retry 3x).</p>
+                            </div>
+                            <button class="btn-primary btn-sm" onclick="loadWebhooksTable()">🔄 Refresh Webhooks</button>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>QRIS ID / Ref ID</th>
+                                        <th>Target Webhook URL</th>
+                                        <th>Percobaan</th>
+                                        <th>Status Delivery</th>
+                                        <th>Error Log</th>
+                                        <th>Waktu</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody-webhooks">
+                                    <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Memuat antrian webhook...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 4: Mutasi Transaksi -->
+                <div class="tab-content" id="tab-tx">
+                    <div class="panel-card">
+                        <div class="toolbar">
+                            <div>
+                                <h3 style="font-size: 18px; font-weight: 700;">💸 Mutasi Transaksi Masuk GoJek</h3>
+                                <p style="font-size: 13px; color: var(--text-muted);">Mutasi saldo dan pembayaran QRIS yang terdeteksi dari API GoJek Merchant.</p>
+                            </div>
+                            <button class="btn-primary btn-sm" onclick="loadTransactionsTable()">🔄 Refresh Mutasi</button>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Tx ID</th>
+                                        <th>Order ID</th>
+                                        <th>Sumber Pembayaran</th>
+                                        <th>Nominal (Rp)</th>
+                                        <th>Status</th>
+                                        <th>Waktu Transaksi</th>
+                                        <th>Connected QRIS ID</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody-tx">
+                                    <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Memuat data mutasi GoJek...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 5: Live System Logs -->
+                <div class="tab-content" id="tab-logs">
+                    <div class="panel-card">
+                        <div class="toolbar">
+                            <div>
+                                <h3 style="font-size: 18px; font-weight: 700;">💻 Live System & Worker Logs</h3>
+                                <p style="font-size: 13px; color: var(--text-muted);">Memantau log aktivitas background worker, transaksi, dan server secara real-time.</p>
+                            </div>
+                            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                                <select id="select-log-level" onchange="filterLogsDisplay()" style="background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-main); padding: 8px 12px; border-radius: 8px; font-size: 12.5px; outline: none;">
+                                    <option value="ALL">Semua Log Level</option>
+                                    <option value="SYSTEM">🟢 SYSTEM</option>
+                                    <option value="INFO">🔵 INFO</option>
+                                    <option value="ERROR">🔴 ERROR</option>
+                                </select>
+                                <button class="btn-primary btn-sm" id="btn-auto-logs" onclick="toggleAutoLogs()" style="background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.3); color: var(--accent-green);">
+                                    ⚡ Auto Refresh (ON)
+                                </button>
+                                <button class="btn-primary btn-sm" onclick="loadLogsConsole()">🔄 Refresh</button>
+                                <button class="btn-primary btn-sm btn-danger" onclick="clearLogsConsole()">🗑️ Clear Display</button>
+                            </div>
+                        </div>
+
+                        <div id="terminal-logs" style="background: #060911; border: 1px solid var(--border-color); border-radius: 14px; padding: 20px; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; color: #d1d5db; max-height: 520px; overflow-y: auto; line-height: 1.7; white-space: pre-wrap;">[SYSTEM] Memuat system logs...</div>
+                    </div>
+                </div>
+
+                <!-- Tab 6: Dokumentasi API Integration -->
+                <div class="tab-content" id="tab-docs">
+                    <div class="panel-card">
+                        <h3 style="font-size: 18px; font-weight: 700; color: var(--accent-cyan); margin-bottom: 12px;">
+                            📖 Dokumentasi Integrasi REST API Multi-App
+                        </h3>
+                        <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 24px; line-height: 1.6;">
+                            Panduan integrasi REST API Gateway untuk toko online, bot Telegram, maupun aplikasi Pihak Ketiga. Setiap request API wajib melampirkan <code>app_id</code> dan <code>app_secret</code>.
+                        </p>
+
+                        <!-- Card 1: Auth Config -->
+                        <div style="background: #111827; border: 1px solid var(--border-color); border-radius: 14px; padding: 20px; margin-bottom: 20px;">
+                            <h4 style="font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 10px;">
+                                🔐 1. Parameter Autentikasi API
+                            </h4>
+                            <ul style="font-size: 13px; color: #d1d5db; margin-left: 20px; line-height: 1.8;">
+                                <li><code>app_id</code>: ID Unik aplikasi Anda (Wajib terdaftar pada <code>ALLOWED_APP_IDS</code> di <code>.env</code>).</li>
+                                <li><code>app_secret</code>: Kunci rahasia global (Sesuai <code>APP_SECRET</code> di <code>.env</code>).</li>
+                            </ul>
+                            <div style="margin-top: 14px; background: rgba(56, 189, 248, 0.08); padding: 12px 16px; border-radius: 10px; border-left: 3px solid var(--accent-cyan); font-size: 13px; color: var(--text-muted);">
+                                💡 <strong>Tips:</strong> Parameter dapat dikirim via <strong>HTTP Headers</strong> (<code>x-app-id</code> & <code>x-app-secret</code>), <strong>JSON Body</strong>, atau <strong>URL Query Parameters</strong>.
+                            </div>
+                        </div>
+
+                        <!-- Card 2: Create QRIS Endpoint -->
+                        <div style="background: #111827; border: 1px solid var(--border-color); border-radius: 14px; padding: 20px; margin-bottom: 20px;">
+                            <h4 style="font-size: 15px; font-weight: 700; color: var(--accent-green); margin-bottom: 10px;">
+                                ⚡ 2. Endpoint Buat QRIS Dinamis (<code>POST /create-qris</code>)
+                            </h4>
+                            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">Mencetak QRIS EMVCo dinamis dengan penambahan kode unik otomatis untuk validasi lunas otomatis.</p>
+                            
+                            <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px; display: block;">Contoh Request Body (JSON):</label>
+                            <pre style="background: #0b0f19; border: 1px solid var(--border-color); padding: 14px; border-radius: 10px; color: var(--accent-cyan); font-size: 13px; overflow-x: auto;">{
+  "app_id": "App1",
+  "app_secret": "secret123",
+  "amount": 10000,
+  "ref_id": "INV-2026-0001",
+  "webhook_url": "https://website-anda.com/api/callback"
+}</pre>
+                        </div>
+
+                        <!-- Card 3: Check Status Endpoint -->
+                        <div style="background: #111827; border: 1px solid var(--border-color); border-radius: 14px; padding: 20px; margin-bottom: 20px;">
+                            <h4 style="font-size: 15px; font-weight: 700; color: var(--accent-amber); margin-bottom: 10px;">
+                                🔍 3. Public Polling Status Endpoint (<code>GET /api/qr-status/:qris_id</code>)
+                            </h4>
+                            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">Endpoint publik ringan untuk polling halaman frontend checkout tanpa membutuhkan API secret.</p>
+                            <pre style="background: #0b0f19; border: 1px solid var(--border-color); padding: 14px; border-radius: 10px; color: var(--accent-amber); font-size: 13px; overflow-x: auto;">// GET http://localhost:3000/api/qr-status/QR-9C6TS3RC
+
+{
+  "success": true,
+  "paid": true,
+  "status": "PAID"
+}</pre>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal Jodohkan Transaksi -->
+    <div id="modal-jodohkan" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); backdrop-filter:blur(8px); z-index:9999; align-items:center; justify-content:center;">
+        <div style="background: var(--bg-card); border:1px solid var(--border-color); border-radius:20px; width:90%; max-width:440px; padding:28px; box-shadow:0 25px 50px -12px rgba(0,0,0,0.7);">
+            <h3 style="font-size:18px; font-weight:700; margin-bottom:8px; color:#fff;">🔗 Jodohkan Transaksi Manual</h3>
+            <p style="font-size:13px; color:var(--text-muted); margin-bottom:20px;" id="modal-tx-info">Transaction ID GoJek: -</p>
+            
+            <div class="form-group">
+                <label for="modal-inp-qris">Masukkan Target QRIS ID (Order ID)</label>
+                <input type="text" id="modal-inp-qris" placeholder="Contoh: 1df8tasv atau QR-ODHFMJIW...">
+            </div>
+
+            <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:24px;">
+                <button class="btn-primary btn-sm" style="background:#374151; box-shadow:none;" onclick="closeJodohkanModal()">Batal</button>
+                <button class="btn-primary btn-sm" id="btn-modal-submit" onclick="submitJodohkanModal()">💾 Simpan & Jodohkan</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let adminPass = sessionStorage.getItem('admin_pass') || '';
+        let autoLogsTimer = null;
+        let isAutoLogsOn = true;
+        let cachedLogsData = [];
+
+        function showAlert(type, text) {
+            const errBox = document.getElementById('msg-error');
+            const succBox = document.getElementById('msg-success');
+            errBox.style.display = 'none';
+            succBox.style.display = 'none';
+
+            if (type === 'error') {
+                errBox.innerText = text;
+                errBox.style.display = 'block';
+            } else {
+                succBox.innerText = text;
+                succBox.style.display = 'block';
+            }
+        }
+
+        const pageMeta = {
+            'orders': { title: 'Order QRIS', subtitle: 'Kelola dan pantau seluruh transaksi QRIS yang diterbitkan.' },
+            'auth': { title: 'Sesi GoBiz Merchant', subtitle: 'Konfigurasi dan verifikasi sesi login GoBiz Merchant.' },
+            'webhooks': { title: 'Antrian Webhook', subtitle: 'Log antrian pengiriman notifikasi HTTP POST otomatis.' },
+            'tx': { title: 'Mutasi Transaksi GoJek', subtitle: 'Daftar riwayat pembayaran yang terdeteksi dari GoJek API.' },
+            'logs': { title: 'Live System Logs Monitor', subtitle: 'Pantau aktivitas background workers, API requests, dan error logs secara real-time.' },
+            'docs': { title: 'Dokumentasi Integrasi API', subtitle: 'Panduan teknis penggunaan REST API Gateway.' }
+        };
+
+        function switchTabByName(tabName, evt) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+            const btnTarget = evt ? (evt.currentTarget || evt.target) : document.querySelector('.tab-btn[data-tab="' + tabName + '"]');
+            if (btnTarget) btnTarget.classList.add('active');
+            
+            const contentTarget = document.getElementById('tab-' + tabName);
+            if (contentTarget) contentTarget.classList.add('active');
+
+            if (pageMeta[tabName]) {
+                document.getElementById('header-page-title').innerText = pageMeta[tabName].title;
+                document.getElementById('header-page-subtitle').innerText = pageMeta[tabName].subtitle;
+            }
+
+            if (tabName !== 'logs' && autoLogsTimer) {
+                clearInterval(autoLogsTimer);
+                autoLogsTimer = null;
+            }
+
+            if (tabName === 'orders') loadOrdersTable();
+            if (tabName === 'webhooks') loadWebhooksTable();
+            if (tabName === 'tx') loadTransactionsTable();
+            if (tabName === 'logs') {
+                loadLogsConsole();
+                if (isAutoLogsOn && !autoLogsTimer) {
+                    autoLogsTimer = setInterval(loadLogsConsole, 3000);
+                }
+            }
+        }
+
+        function refreshCurrentTab() {
+            const activeTab = document.querySelector('.tab-btn.active');
+            if (activeTab) {
+                const tabName = activeTab.getAttribute('data-tab');
+                switchTabByName(tabName);
+            }
+        }
+
+        function lockPortalAdmin() {
+            sessionStorage.removeItem('admin_pass');
+            adminPass = '';
+            location.reload();
+        }
+
+        async function unlockAdmin() {
+            const pass = document.getElementById('inp-admin-pass').value.trim();
+            if (!pass) {
+                showAlert('error', 'Masukkan Password Admin terlebih dahulu.');
+                return;
+            }
+
+            const btn = document.getElementById('btn-unlock');
+            const spin = document.getElementById('spin-lock');
+            const lbl = document.getElementById('lbl-lock');
+
+            btn.disabled = true;
+            spin.style.display = 'inline-block';
+            lbl.innerText = 'Memverifikasi...';
+
+            try {
+                const res = await fetch('/api/login/admin-auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ admin_password: pass })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    adminPass = pass;
+                    sessionStorage.setItem('admin_pass', pass);
+                    document.getElementById('section-admin-lock').style.display = 'none';
+                    document.getElementById('section-dashboard').classList.add('active');
+                    
+                    switchTabByName('orders');
+                } else {
+                    sessionStorage.removeItem('admin_pass');
+                    adminPass = '';
+                    showAlert('error', data.message || 'Password Admin Salah');
+                }
+            } catch (err) {
+                showAlert('error', 'Error: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                spin.style.display = 'none';
+                lbl.innerText = '🔑 Masuk ke Portal Admin';
+            }
+        }
+
+        if (adminPass) {
+            document.getElementById('inp-admin-pass').value = adminPass;
+            unlockAdmin();
+        }
+
+        async function loadLogsConsole() {
+            const container = document.getElementById('terminal-logs');
+            try {
+                const res = await fetch('/api/logs?api_key=' + encodeURIComponent(adminPass));
+                const data = await res.json();
+                if (data.success && data.logs) {
+                    cachedLogsData = data.logs;
+                    filterLogsDisplay();
+                }
+            } catch (e) {
+                container.innerText = '[ERROR] Gagal memuat logs: ' + e.message;
+            }
+        }
+
+        function filterLogsDisplay() {
+            const container = document.getElementById('terminal-logs');
+            const selectedLevel = document.getElementById('select-log-level').value;
+            let logsToRender = cachedLogsData;
+
+            if (selectedLevel !== 'ALL') {
+                logsToRender = cachedLogsData.filter(l => l.level === selectedLevel);
+            }
+
+            if (logsToRender.length === 0) {
+                container.innerHTML = '<span style="color:#64748b;">(Belum ada log sesuai filter)</span>';
+                return;
+            }
+
+            const formattedHtml = logsToRender.map(l => {
+                let badgeColor = '#38bdf8';
+                if (l.level === 'SYSTEM') badgeColor = '#4ade80';
+                if (l.level === 'ERROR') badgeColor = '#f87171';
+                if (l.level === 'INFO') badgeColor = '#38bdf8';
+
+                const timeStr = new Date(l.timestamp).toLocaleTimeString('id-ID');
+                return '<span style="color:#64748b;">[' + timeStr + ']</span> <span style="color:' + badgeColor + '; font-weight:700;">[' + l.level + ']</span> ' + escapeHtml(l.message);
+            }).join('\\n');
+
+            container.innerHTML = formattedHtml;
+        }
+
+        function toggleAutoLogs() {
+            const btn = document.getElementById('btn-auto-logs');
+            isAutoLogsOn = !isAutoLogsOn;
+            if (isAutoLogsOn) {
+                btn.style.background = 'rgba(34,197,94,0.15)';
+                btn.style.borderColor = 'rgba(34,197,94,0.3)';
+                btn.style.color = 'var(--accent-green)';
+                btn.innerText = '⚡ Auto Refresh (ON)';
+                loadLogsConsole();
+                if (!autoLogsTimer) autoLogsTimer = setInterval(loadLogsConsole, 3000);
+            } else {
+                btn.style.background = 'rgba(100,116,139,0.15)';
+                btn.style.borderColor = 'rgba(100,116,139,0.3)';
+                btn.style.color = 'var(--text-muted)';
+                btn.innerText = '⏸️ Auto Refresh (OFF)';
+                if (autoLogsTimer) {
+                    clearInterval(autoLogsTimer);
+                    autoLogsTimer = null;
+                }
+            }
+        }
+
+        function clearLogsConsole() {
+            document.getElementById('terminal-logs').innerText = '(Tampilan log di-cleared)';
+        }
+
+        function escapeHtml(text) {
+            return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        async function loadOrdersTable() {
+            const tbody = document.getElementById('tbody-orders');
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Memuat data order...</td></tr>';
+            try {
+                const res = await fetch('/api/orders?limit=50&api_key=' + encodeURIComponent(adminPass));
+                const data = await res.json();
+                if (data.success && data.data) {
+                    if (data.data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Belum ada data order QRIS.</td></tr>';
+                        return;
+                    }
+                    tbody.innerHTML = data.data.map(function(o) {
+                        var statusTag = o.status === 'PAID' ? '<span class="tag tag-paid">🟢 PAID</span>' : (o.status === 'EXPIRED' ? '<span class="tag tag-expired">🔴 EXPIRED</span>' : '<span class="tag tag-pending">🟡 PENDING</span>');
+                        var whTag = o.webhookStatus === 'SUCCESS' ? '<span class="tag tag-success">🟢 SUCCESS</span>' : (o.webhookStatus === 'FAILED' ? '<span class="tag tag-failed">🔴 FAILED</span>' : (o.webhookStatus === 'QUEUED' || o.webhookStatus === 'PENDING' ? '<span class="tag tag-pending">🟡 QUEUED</span>' : '<span style="color:#64748b;">-</span>'));
+                        var fmtAmount = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(o.amount);
+                        var fmtDate = new Date(o.createdAt).toLocaleString('id-ID');
+                        var claimBtn = (o.status !== 'PAID') 
+                            ? '<button class="btn-primary btn-sm" onclick="manualClaimOrder(\\\'' + o.qrisId + '\\\')" style="background:#16a34a; font-size:11px; padding:4px 8px; margin-left:6px;">✅ Validasi Manual</button>' 
+                            : '';
+                        return '<tr>' +
+                            '<td><strong>' + o.qrisId + '</strong></td>' +
+                            '<td><span class="tag" style="background:rgba(56,189,248,0.15); color:var(--accent-cyan); border:1px solid rgba(56,189,248,0.3);">' + (o.appId || 'default') + '</span></td>' +
+                            '<td>' + (o.clientRefId || '-') + '</td>' +
+                            '<td>' + fmtAmount + ' <small style="color:var(--text-muted);">(Unik: +' + o.uniqueCode + ')</small></td>' +
+                            '<td>' + statusTag + '</td>' +
+                            '<td>' + whTag + '</td>' +
+                            '<td>' + fmtDate + '</td>' +
+                            '<td><a href="/qr/' + o.qrisId + '" target="_blank" style="color:var(--accent-cyan); text-decoration:none; font-weight:600;">🔗 Lihat QR</a> ' + claimBtn + '</td>' +
+                        '</tr>';
+                    }).join('');
+                }
+            } catch (e) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--accent-red);">Gagal memuat order: ' + e.message + '</td></tr>';
+            }
+        }
+
+        async function manualClaimOrder(qrisId, txId = null) {
+            let confirmMsg = 'Konfirmasi validasi LUNAS manual untuk QRIS ID ' + qrisId + '? Notifikasi webhook akan dikirimkan otomatis.';
+            if (txId) {
+                confirmMsg = 'Jodohkan transaksi ID ' + txId + ' dengan QRIS ID ' + qrisId + ' secara manual?';
+            } else {
+                const inputTx = prompt('Validasi Manual untuk QRIS ID: ' + qrisId + '\\nMasukkan Transaction ID GoJek (Opsional / Boleh Kosong):');
+                if (inputTx === null) return;
+                if (inputTx.trim()) txId = inputTx.trim();
+            }
+
+            if (!confirm(confirmMsg)) return;
+
+            try {
+                const res = await fetch('/api/orders/manual-claim', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': adminPass
+                    },
+                    body: JSON.stringify({
+                        qris_id: qrisId,
+                        transaction_id: txId,
+                        notes: 'Validasi Manual via Admin Portal'
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert(data.message);
+                    loadOrdersTable();
+                    loadTransactionsTable();
+                    loadWebhooksTable();
+                } else {
+                    alert('Gagal: ' + (data.message || 'Gagal klaim manual'));
+                }
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        }
+
+        let currentJodohkanTxId = '';
+
+        function promptLinkToQris(txId) {
+            currentJodohkanTxId = txId;
+            document.getElementById('modal-tx-info').innerText = 'Transaction ID GoJek: ' + txId;
+            document.getElementById('modal-inp-qris').value = '';
+            document.getElementById('modal-jodohkan').style.display = 'flex';
+        }
+
+        function closeJodohkanModal() {
+            document.getElementById('modal-jodohkan').style.display = 'none';
+        }
+
+        async function submitJodohkanModal() {
+            const targetQris = document.getElementById('modal-inp-qris').value.trim();
+            if (!targetQris) {
+                alert('Silakan masukkan QRIS ID terlebih dahulu.');
+                return;
+            }
+            closeJodohkanModal();
+            await manualClaimOrder(targetQris, currentJodohkanTxId);
+        }
+
+        async function clearAllOrders() {
+            if (!confirm('Apakah Anda yakin ingin menghapus SELURUH data order QRIS dari database?')) return;
+            try {
+                const res = await fetch('/api/orders/clear', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': adminPass
+                    }
+                });
+                const data = await res.json();
+                alert(data.message);
+                loadOrdersTable();
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        }
+
+        async function loadWebhooksTable() {
+            const tbody = document.getElementById('tbody-webhooks');
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Memuat antrian webhook...</td></tr>';
+            try {
+                const res = await fetch('/api/webhooks?limit=50&api_key=' + encodeURIComponent(adminPass));
+                const data = await res.json();
+                if (data.success && data.data) {
+                    if (data.data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Belum ada antrian webhook.</td></tr>';
+                        return;
+                    }
+                    tbody.innerHTML = data.data.map(function(w) {
+                        var statusTag = w.status === 'SUCCESS' ? '<span class="tag tag-success">🟢 SUCCESS</span>' : (w.status === 'FAILED' ? '<span class="tag tag-failed">🔴 FAILED</span>' : '<span class="tag tag-pending">🟡 PENDING</span>');
+                        var fmtDate = new Date(w.createdAt).toLocaleString('id-ID');
+                        var refText = w.clientRefId ? '<small style="color:var(--text-muted);">(' + w.clientRefId + ')</small>' : '';
+                        return '<tr>' +
+                            '<td>#' + w.id + '</td>' +
+                            '<td><strong>' + w.qrisId + '</strong> ' + refText + '</td>' +
+                            '<td style="max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">' + w.webhookUrl + '</td>' +
+                            '<td>' + w.attempts + '/' + w.maxAttempts + '</td>' +
+                            '<td>' + statusTag + '</td>' +
+                            '<td style="color:var(--accent-red); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">' + (w.lastError || '-') + '</td>' +
+                            '<td>' + fmtDate + '</td>' +
+                        '</tr>';
+                    }).join('');
+                }
+            } catch (e) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--accent-red);">Gagal memuat webhooks: ' + e.message + '</td></tr>';
+            }
+        }
+
+        async function loadTransactionsTable() {
+            const tbody = document.getElementById('tbody-tx');
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Memuat mutasi GoJek...</td></tr>';
+            try {
+                const res = await fetch('/transactions?pageSize=50&api_key=' + encodeURIComponent(adminPass));
+                const data = await res.json();
+                if (data.success && data.data) {
+                    document.getElementById('val-total-tx').innerText = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(data.total_amount || 0);
+                    if (data.data.transactions.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Belum ada transaksi mutasi GoJek.</td></tr>';
+                        return;
+                    }
+                    tbody.innerHTML = data.data.transactions.map(function(t) {
+                        var fmtAmount = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(t.amount);
+                        var fmtDate = t.time ? new Date(t.time).toLocaleString('id-ID') : '-';
+                        var linkBtn = (!t.qris_id) ? '<button class="btn-primary btn-sm" onclick="promptLinkToQris(\\\'' + t.transaction_id + '\\\')" style="font-size:11px; padding:3px 8px; margin-left:6px;">🔗 Jodohkan</button>' : '';
+                        var qrisLink = t.qris_id ? '<a href="/qr/' + t.qris_id + '" target="_blank" style="color:var(--accent-green); text-decoration:none; font-weight:600;">🟢 ' + t.qris_id + '</a>' : '<span style="color:var(--text-muted);">- (Unclaimed) ' + linkBtn + '</span>';
+                        return '<tr>' +
+                            '<td><small>' + (t.transaction_id || '-') + '</small></td>' +
+                            '<td><small>' + (t.order_id || '-') + '</small></td>' +
+                            '<td><strong>' + (t.issuer || 'GoPay / Bank') + '</strong></td>' +
+                            '<td style="color:var(--accent-cyan); font-weight:700;">' + fmtAmount + '</td>' +
+                            '<td><span class="tag tag-success">' + (t.status || 'success') + '</span></td>' +
+                            '<td>' + fmtDate + '</td>' +
+                            '<td>' + qrisLink + '</td>' +
+                        '</tr>';
+                    }).join('');
+                }
+            } catch (e) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--accent-red);">Gagal memuat mutasi: ' + e.message + '</td></tr>';
+            }
+        }
+
+        async function requestOTP() {
+            const phone = document.getElementById('inp-phone').value.trim();
+            if (!phone) {
+                showAlert('error', 'Silakan masukkan nomor HP GoBiz Anda terlebih dahulu.');
+                return;
+            }
+
+            const btn = document.getElementById('btn-otp');
+            const spin = document.getElementById('spin-1');
+            const lbl = document.getElementById('lbl-1');
+
+            btn.disabled = true;
+            spin.style.display = 'inline-block';
+            lbl.innerText = 'Mengirim OTP...';
+
+            try {
+                const res = await fetch('/api/login/request-otp', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'x-admin-password': adminPass 
+                    },
+                    body: JSON.stringify({ phone: phone, admin_password: adminPass })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    showAlert('success', data.message);
+                    document.getElementById('step-1').style.display = 'none';
+                    document.getElementById('step-2').style.display = 'block';
+                } else {
+                    showAlert('error', data.message || 'Gagal mengirimkan OTP');
+                }
+            } catch (err) {
+                showAlert('error', 'Error: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                spin.style.display = 'none';
+                lbl.innerText = '📱 Kirim Kode OTP (SMS/WA)';
+            }
+        }
+
+        async function verifyOTP() {
+            const otp = document.getElementById('inp-otp').value.trim();
+            if (!otp) {
+                showAlert('error', 'Silakan masukkan kode OTP yang Anda terima.');
+                return;
+            }
+
+            const btn = document.getElementById('btn-verify');
+            const spin = document.getElementById('spin-2');
+            const lbl = document.getElementById('lbl-2');
+
+            btn.disabled = true;
+            spin.style.display = 'inline-block';
+            lbl.innerText = 'Memverifikasi...';
+
+            try {
+                const res = await fetch('/api/login/verify-otp', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'x-admin-password': adminPass
+                    },
+                    body: JSON.stringify({ otp_code: otp, admin_password: adminPass })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    showAlert('success', data.message);
+                    document.getElementById('session-badge').className = 'status-badge status-active';
+                    document.getElementById('status-icon').innerText = '🟢';
+                    document.getElementById('status-text').innerText = 'Sesi GoPay Merchant Aktif & Siap Menerima Order';
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showAlert('error', data.message || 'Kode OTP Salah');
+                }
+            } catch (err) {
+                showAlert('error', 'Error: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                spin.style.display = 'none';
+                lbl.innerText = '✅ Verifikasi & Aktifkan Sesi';
+            }
+        }
+
+        async function logoutSession() {
+            if (!confirm('Apakah Anda yakin ingin MENGHAPUS file sesi login GoBiz Merchant dari server?\\n\\nPerhatian: Gateway tidak dapat mengecek transaksi otomatis sampai Anda melakukan verifikasi OTP ulang.')) return;
+            try {
+                const res = await fetch('/api/login/logout', { 
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'x-admin-password': adminPass
+                    },
+                    body: JSON.stringify({ admin_password: adminPass })
+                });
+                const data = await res.json();
+                alert(data.message);
+                location.reload();
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        }
+    </script>
+</body>
+</html>`;
+}
+
+module.exports = {
+    renderAdminDashboard
+};

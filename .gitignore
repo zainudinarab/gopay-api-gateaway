@@ -5,5 +5,10 @@ node_modules/
 *.log
 *.raw.js
 obfuscate.js
+gateway.db
+gateway.db-shm
+gateway.db-wal
+*.db
+*.db-journal
 
 
