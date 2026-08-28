@@ -979,7 +979,7 @@ User-Agent: GoPay-Gateway-Webhook-Worker/1.0</pre>
     </div>
 
     <script>
-        let adminPass = sessionStorage.getItem('admin_pass') || '';
+        let adminPass = localStorage.getItem('admin_pass') || sessionStorage.getItem('admin_pass') || '';
         let autoLogsTimer = null;
         let isAutoLogsOn = true;
         let cachedLogsData = [];
@@ -1048,6 +1048,7 @@ User-Agent: GoPay-Gateway-Webhook-Worker/1.0</pre>
         }
 
         function lockPortalAdmin() {
+            localStorage.removeItem('admin_pass');
             sessionStorage.removeItem('admin_pass');
             adminPass = '';
             location.reload();
@@ -1078,12 +1079,14 @@ User-Agent: GoPay-Gateway-Webhook-Worker/1.0</pre>
 
                 if (data.success) {
                     adminPass = pass;
+                    localStorage.setItem('admin_pass', pass);
                     sessionStorage.setItem('admin_pass', pass);
                     document.getElementById('section-admin-lock').style.display = 'none';
                     document.getElementById('section-dashboard').classList.add('active');
                     
                     switchTabByName('orders');
                 } else {
+                    localStorage.removeItem('admin_pass');
                     sessionStorage.removeItem('admin_pass');
                     adminPass = '';
                     showAlert('error', data.message || 'Password Admin Salah');
