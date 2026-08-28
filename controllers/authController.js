@@ -2,6 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
+const db = require('../db');
 const { mutationCache } = require('../services/gojekService');
 const { logActivity } = require('../services/loggerService');
 
@@ -136,8 +137,9 @@ const logout = (req, res) => {
         if (fs.existsSync(sessionFile)) {
             fs.unlinkSync(sessionFile);
         }
+        db.deleteMerchantSession();
         mutationCache.data = null;
-        logActivity('INFO', '[WEB LOGIN] Sesi GoBiz berhasil dihapus (Logout).');
+        logActivity('INFO', '[WEB LOGIN] Sesi GoBiz berhasil dihapus dari Disk & Database.');
         res.json({ success: true, message: 'Sesi GoBiz Berhasil Dihapus (Logged Out).' });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });

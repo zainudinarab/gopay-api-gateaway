@@ -50,6 +50,12 @@ db.exec(`
         created_at INTEGER NOT NULL,
         next_attempt_at INTEGER NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS merchant_sessions (
+        session_key TEXT PRIMARY KEY,
+        session_data TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+    );
 `);
 
 // Add missing columns if database existed before
@@ -379,5 +385,27 @@ module.exports = {
 
     updateClaimedTransactionOwner(transactionId, qrisId) {
         db.prepare(`UPDATE claimed_transactions SET qris_id = ? WHERE transaction_id = ?`).run(qrisId, transactionId);
+    },
+
+    saveMerchantSession(sessionData, key = 'gobiz_primary') {
+        const str = typeof sessionData === 'object' ? JSON.stringify(sessionData, null, 2) : String(sessionData);
+        db.prepare(`
+            INSERT OR REPLACE INTO merchant_sessions (session_key, session_data, updated_at)
+            VALUES (?, ?, ?)
+        `).run(key, str, Date.now());
+    },
+
+    getMerchantSession(key = 'gobiz_primary') {
+        const row = db.prepare(`SELECT session_data FROM merchant_sessions WHERE session_key = ?`).get(key);
+        if (!row || !row.session_data) return null;
+        try {
+            return JSON.parse(row.session_data);
+        } catch (e) {
+            return row.session_data;
+        }
+    },
+
+    deleteMerchantSession(key = 'gobiz_primary') {
+        db.prepare(`DELETE FROM merchant_sessions WHERE session_key = ?`).run(key);
     }
 };
