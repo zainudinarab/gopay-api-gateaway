@@ -17,9 +17,12 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+const { renderHomePage } = require('./views/homeView');
+
 // Root & Health Check Endpoints
 app.get('/', (req, res) => {
-    res.send('GoPay Partner API Gateway Berjalan (SQLite DB, 10s Cache & Webhook Queue Active)');
+    res.setHeader('Content-Type', 'text/html');
+    res.send(renderHomePage());
 });
 
 app.get('/health', (req, res) => {
