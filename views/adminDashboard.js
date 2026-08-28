@@ -814,32 +814,74 @@ function renderAdminDashboard(sessionExists) {
                         <!-- Card 2: Create QRIS Endpoint -->
                         <div style="background: #111827; border: 1px solid var(--border-color); border-radius: 14px; padding: 20px; margin-bottom: 20px;">
                             <h4 style="font-size: 15px; font-weight: 700; color: var(--accent-green); margin-bottom: 10px;">
-                                ⚡ 2. Endpoint Buat QRIS Dinamis (<code>POST /create-qris</code>)
+                                ⚡ 2. Buat QRIS Dinamis (<code>POST /create-qris</code>)
                             </h4>
-                            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">Mencetak QRIS EMVCo dinamis dengan penambahan kode unik otomatis untuk validasi lunas otomatis.</p>
+                            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 14px;">Mencetak QRIS EMVCo dinamis dengan penguncian nominal & kode unik otomatis.</p>
                             
-                            <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px; display: block;">Contoh Request Body (JSON):</label>
-                            <pre style="background: #0b0f19; border: 1px solid var(--border-color); padding: 14px; border-radius: 10px; color: var(--accent-cyan); font-size: 13px; overflow-x: auto;">{
+                            <div style="font-size: 12px; font-weight: 700; color: var(--accent-cyan); margin-bottom: 4px;">🔑 HTTP Headers:</div>
+                            <pre style="background: #0b0f19; border: 1px solid var(--border-color); padding: 10px 14px; border-radius: 8px; color: #38bdf8; font-size: 12px; margin-bottom: 12px;">Content-Type: application/json
+x-app-id: App1
+x-app-secret: secret123</pre>
+
+                            <div style="font-size: 12px; font-weight: 700; color: var(--accent-cyan); margin-bottom: 4px;">📥 Request Body (JSON):</div>
+                            <pre style="background: #0b0f19; border: 1px solid var(--border-color); padding: 10px 14px; border-radius: 8px; color: #a5f3fc; font-size: 12px; margin-bottom: 12px;">{
   "app_id": "App1",
   "app_secret": "secret123",
   "amount": 10000,
-  "ref_id": "INV-2026-0001",
-  "webhook_url": "https://website-anda.com/api/callback"
+  "ref_id": "INV-20260828-0001",
+  "webhook_url": "https://website-anda.com/api/callback",
+  "expires_in_hours": 12
+}</pre>
+
+                            <div style="font-size: 12px; font-weight: 700; color: var(--accent-green); margin-bottom: 4px;">📤 Response Success (200 OK):</div>
+                            <pre style="background: #0b0f19; border: 1px solid var(--border-color); padding: 10px 14px; border-radius: 8px; color: #4ade80; font-size: 12px; margin-bottom: 12px;">{
+  "success": true,
+  "data": {
+    "qris_id": "QR-9C6TS3RC",
+    "trx_id": "TRX-4UR9CRCC",
+    "app_id": "App1",
+    "client_ref_id": "INV-20260828-0001",
+    "base_amount": 10000,
+    "unique_code": 14,
+    "amount": 10014,
+    "qris_string": "000201010212...",
+    "qris_image_url": "http://localhost:3000/qr/QR-9C6TS3RC.png",
+    "qris_image_base64": "data:image/png;base64,iVBORw0KG...",
+    "checkout_url": "http://localhost:3000/qr/QR-9C6TS3RC",
+    "webhook_url": "https://website-anda.com/api/callback",
+    "expires_at": "2026-08-28T22:00:00.000Z"
+  }
+}</pre>
+
+                            <div style="font-size: 12px; font-weight: 700; color: var(--accent-red); margin-bottom: 4px;">❌ Response Error (400 Bad Request / 401 Unauthorized):</div>
+                            <pre style="background: #0b0f19; border: 1px solid var(--border-color); padding: 10px 14px; border-radius: 8px; color: #f87171; font-size: 12px;">{
+  "success": false,
+  "message": "app_id wajib diisi & terdaftar di ALLOWED_APP_IDS"
 }</pre>
                         </div>
 
                         <!-- Card 3: Check Status Endpoint -->
                         <div style="background: #111827; border: 1px solid var(--border-color); border-radius: 14px; padding: 20px; margin-bottom: 20px;">
                             <h4 style="font-size: 15px; font-weight: 700; color: var(--accent-cyan); margin-bottom: 10px;">
-                                🔍 3. Public Polling Status Endpoint (<code>GET /api/qr-status/:qris_id</code>)
+                                🔍 3. Public Polling Status Frontend (<code>GET /api/qr-status/:qris_id</code>)
                             </h4>
-                            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">Endpoint publik ringan untuk polling halaman frontend checkout tanpa membutuhkan API secret.</p>
-                            <pre style="background: #0b0f19; border: 1px solid var(--border-color); padding: 14px; border-radius: 10px; color: var(--accent-cyan); font-size: 13px; overflow-x: auto;">// GET http://localhost:3000/api/qr-status/QR-9C6TS3RC
+                            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 14px;">Endpoint publik ringan untuk polling halaman frontend checkout tanpa butuh secret key.</p>
+                            
+                            <div style="font-size: 12px; font-weight: 700; color: var(--accent-cyan); margin-bottom: 4px;">📥 URL Path Parameter:</div>
+                            <pre style="background: #0b0f19; border: 1px solid var(--border-color); padding: 10px 14px; border-radius: 8px; color: #38bdf8; font-size: 12px; margin-bottom: 12px;">GET http://localhost:3000/api/qr-status/QR-9C6TS3RC</pre>
 
-{
+                            <div style="font-size: 12px; font-weight: 700; color: var(--accent-green); margin-bottom: 4px;">📤 Response Status LUNAS (PAID):</div>
+                            <pre style="background: #0b0f19; border: 1px solid var(--border-color); padding: 10px 14px; border-radius: 8px; color: #4ade80; font-size: 12px;">{
   "success": true,
   "paid": true,
-  "status": "PAID"
+  "status": "PAID",
+  "transaction": {
+    "transaction_id": "01a03c85-...",
+    "amount": 10014,
+    "payer_issuer": "AirPay Shopee / BCA / GoPay",
+    "payment_type": "QRIS",
+    "transaction_time": "2026-08-28T10:15:00+07:00"
+  }
 }</pre>
                         </div>
 
@@ -848,27 +890,53 @@ function renderAdminDashboard(sessionExists) {
                             <h4 style="font-size: 15px; font-weight: 700; color: #a855f7; margin-bottom: 10px;">
                                 🔔 4. Skema Webhook Callback HTTP POST (<code>webhook_url</code>)
                             </h4>
-                            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">Dikirim otomatis ke server Pihak Ketiga saat status transaksi menjadi LUNAS (PAID).</p>
-                            <pre style="background: #0b0f19; border: 1px solid var(--border-color); padding: 14px; border-radius: 10px; color: #c084fc; font-size: 13px; overflow-x: auto;">{
+                            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 14px;">Dikirim otomatis dari Gateway ke server Pihak Ketiga saat status pembayaran LUNAS.</p>
+                            
+                            <div style="font-size: 12px; font-weight: 700; color: #a855f7; margin-bottom: 4px;">🔑 HTTP Headers Callback:</div>
+                            <pre style="background: #0b0f19; border: 1px solid var(--border-color); padding: 10px 14px; border-radius: 8px; color: #c084fc; font-size: 12px; margin-bottom: 12px;">Content-Type: application/json
+User-Agent: GoPay-Gateway-Webhook-Worker/1.0</pre>
+
+                            <div style="font-size: 12px; font-weight: 700; color: #a855f7; margin-bottom: 4px;">📥 Payload JSON Dikirimkan:</div>
+                            <pre style="background: #0b0f19; border: 1px solid var(--border-color); padding: 10px 14px; border-radius: 8px; color: #e9d5ff; font-size: 12px;">{
   "event": "payment.success",
   "qris_id": "QR-9C6TS3RC",
   "trx_id": "TRX-4UR9CRCC",
-  "client_ref_id": "INV-2026-0001",
+  "client_ref_id": "INV-20260828-0001",
   "status": "PAID",
-  "amount": 10014
+  "amount": 10014,
+  "base_amount": 10000,
+  "unique_code": 14,
+  "transaction": {
+    "transaction_id": "01a03c85-...",
+    "amount": 10014,
+    "payer_issuer": "AirPay Shopee / BCA",
+    "transaction_time": "2026-08-28T10:15:00+07:00"
+  }
 }</pre>
                         </div>
 
-                        <!-- Card 5: Manual Claim Order -->
+                        <!-- Card 5: Check Payment Backend -->
                         <div style="background: #111827; border: 1px solid var(--border-color); border-radius: 14px; padding: 20px; margin-bottom: 20px;">
                             <h4 style="font-size: 15px; font-weight: 700; color: #f59e0b; margin-bottom: 10px;">
-                                🛠️ 5. Validasi Manual / Jodohkan Transaksi (<code>POST /api/orders/manual-claim</code>)
+                                🔍 5. Cek Status Pembayaran Backend (<code>POST /api/check-payment</code>)
                             </h4>
-                            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">Headers: <code>x-api-key: admin123456</code>. Memvalidasi order manual dan memicu pengiriman webhook callback.</p>
-                            <pre style="background: #0b0f19; border: 1px solid var(--border-color); padding: 14px; border-radius: 10px; color: #fbbf24; font-size: 13px; overflow-x: auto;">{
-  "qris_id": "QR-9C6TS3RC",
-  "transaction_id": "01a03c85-...",
-  "notes": "Validasi Manual Admin"
+                            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 14px;">Memeriksa status pembayaran dari server/backend Anda menggunakan API Secret.</p>
+                            
+                            <div style="font-size: 12px; font-weight: 700; color: #f59e0b; margin-bottom: 4px;">📥 Request Body (JSON):</div>
+                            <pre style="background: #0b0f19; border: 1px solid var(--border-color); padding: 10px 14px; border-radius: 8px; color: #fde68a; font-size: 12px; margin-bottom: 12px;">{
+  "app_id": "App1",
+  "app_secret": "secret123",
+  "qris_id": "QR-9C6TS3RC"
+}</pre>
+
+                            <div style="font-size: 12px; font-weight: 700; color: var(--accent-green); margin-bottom: 4px;">📤 Response JSON:</div>
+                            <pre style="background: #0b0f19; border: 1px solid var(--border-color); padding: 10px 14px; border-radius: 8px; color: #4ade80; font-size: 12px;">{
+  "success": true,
+  "paid": true,
+  "status": "PAID",
+  "amount": 10014,
+  "client_ref_id": "INV-20260828-0001",
+  "paid_at": "2026-08-28T10:15:00+07:00"
 }</pre>
                         </div>
 
