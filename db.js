@@ -2,18 +2,28 @@
 const path = require('path');
 const fs = require('fs');
 
+const DB_TYPE = (process.env.DB_TYPE || 'sqlite').toLowerCase();
 const DATABASE_URL = process.env.DATABASE_URL;
-const isPostgres = Boolean(DATABASE_URL && (DATABASE_URL.startsWith('postgres://') || DATABASE_URL.startsWith('postgresql://')));
+const isPostgres = DB_TYPE === 'postgres' || Boolean(DATABASE_URL && (DATABASE_URL.startsWith('postgres://') || DATABASE_URL.startsWith('postgresql://')));
 
 let sqliteDb = null;
 let pgPool = null;
 
 if (isPostgres) {
     const { Pool } = require('pg');
-    pgPool = new Pool({
+    const pgConfig = DATABASE_URL ? {
         connectionString: DATABASE_URL,
         ssl: process.env.PGSSLMODE === 'require' ? { rejectUnauthorized: false } : false
-    });
+    } : {
+        host: process.env.DB_HOST || 'localhost',
+        port: parseInt(process.env.DB_PORT || '5432', 10),
+        user: process.env.DB_USER || 'postgres',
+        password: process.env.DB_PASSWORD || '',
+        database: process.env.DB_NAME || 'gopay_gateway',
+        ssl: process.env.PGSSLMODE === 'require' ? { rejectUnauthorized: false } : false
+    };
+
+    pgPool = new Pool(pgConfig);
 
     // Initialize PostgreSQL Tables
     const initPgSchema = async () => {
