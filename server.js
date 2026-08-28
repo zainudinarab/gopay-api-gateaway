@@ -26,7 +26,7 @@ app.get('/', (req, res) => {
 });
 
 app.get('/health', (req, res) => {
-    res.json({ status: 'OK', service: 'GoPay Partner API Gateway', database: 'SQLite (gateway.db)', timestamp: new Date() });
+    res.json({ status: 'OK', service: 'GoPay Payment Gateway', timestamp: new Date() });
 });
 
 app.get('/api/health', (req, res) => {

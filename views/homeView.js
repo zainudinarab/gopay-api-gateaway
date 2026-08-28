@@ -5,10 +5,10 @@ function renderHomePage() {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GoPay Partner API Gateway</title>
+    <title>GoPay Payment Gateway</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg-body: #0b0f19;
@@ -20,7 +20,6 @@ function renderHomePage() {
             --accent-cyan: #38bdf8;
             --accent-blue: #0284c7;
             --accent-green: #22c55e;
-            --accent-purple: #a855f7;
             --glow-cyan: rgba(56, 189, 248, 0.2);
         }
 
@@ -41,7 +40,7 @@ function renderHomePage() {
 
         .container {
             width: 100%;
-            max-width: 860px;
+            max-width: 820px;
             text-align: center;
             animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
         }
@@ -71,7 +70,7 @@ function renderHomePage() {
             background: rgba(34, 197, 94, 0.12);
             color: var(--accent-green);
             border: 1px solid rgba(34, 197, 94, 0.3);
-            padding: 6px 14px;
+            padding: 6px 16px;
             border-radius: 20px;
             font-size: 13px;
             font-weight: 700;
@@ -93,7 +92,7 @@ function renderHomePage() {
         }
 
         h1 {
-            font-size: 36px;
+            font-size: 34px;
             font-weight: 800;
             color: #ffffff;
             letter-spacing: -0.5px;
@@ -101,9 +100,9 @@ function renderHomePage() {
         }
 
         p.subtitle {
-            font-size: 16px;
+            font-size: 15.5px;
             color: var(--text-muted);
-            max-width: 600px;
+            max-width: 580px;
             margin: 0 auto 36px;
             line-height: 1.6;
         }
@@ -111,7 +110,7 @@ function renderHomePage() {
         /* Features Grid */
         .features-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
             gap: 18px;
             margin-bottom: 36px;
             text-align: left;
@@ -165,7 +164,7 @@ function renderHomePage() {
             gap: 10px;
             font-weight: 700;
             font-size: 14px;
-            padding: 14px 28px;
+            padding: 14px 32px;
             border-radius: 14px;
             text-decoration: none;
             transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
@@ -182,18 +181,6 @@ function renderHomePage() {
         .btn-primary:hover {
             transform: translateY(-2px);
             box-shadow: 0 8px 25px rgba(2, 132, 199, 0.6);
-        }
-
-        .btn-secondary {
-            background: var(--bg-card);
-            color: var(--text-main);
-            border: 1px solid var(--border-color);
-        }
-
-        .btn-secondary:hover {
-            background: var(--bg-card-hover);
-            border-color: rgba(255, 255, 255, 0.2);
-            transform: translateY(-2px);
         }
 
         footer {
@@ -213,50 +200,47 @@ function renderHomePage() {
         <div style="display: block;">
             <div class="status-badge">
                 <span class="pulse-dot"></span>
-                <span>Gateway Status: Online (SQLite WAL)</span>
+                <span>System Status: Active & Operational</span>
             </div>
         </div>
 
-        <h1>GoPay Partner API Gateway</h1>
-        <p class="subtitle">Otomatisasi cetak QRIS dinamis, pencocokan transaksi real-time, pengiriman webhook queue, dan manajemen sesi GoBiz Merchant.</p>
+        <h1>GoPay Payment Gateway</h1>
+        <p class="subtitle">Layanan API Gateway Pembayaran QRIS Otomatis & Real-time Transaction Verification System.</p>
 
         <div class="features-grid">
             <div class="feature-card">
-                <div class="feature-icon">🤖</div>
-                <div class="feature-title">Auto-Reconciler Worker</div>
-                <div class="feature-desc">Pemeriksaan mutasi GoJek & pencocokan order otomatis setiap 5 detik.</div>
+                <div class="feature-icon">⚡</div>
+                <div class="feature-title">Penerbitan QRIS Dinamis</div>
+                <div class="feature-desc">Pembuatan kode QRIS secara instan & presisi per transaksi pembayaran.</div>
             </div>
 
             <div class="feature-card">
                 <div class="feature-icon">🔔</div>
-                <div class="feature-title">Webhook Queue Engine</div>
-                <div class="feature-desc">Pengiriman callback HTTP POST otomatis ke Pihak Ketiga dengan retry 3x.</div>
+                <div class="feature-title">Notifikasi Real-Time</div>
+                <div class="feature-desc">Pengiriman notifikasi callback otomatis ke sistem pihak ketiga saat terbayar.</div>
             </div>
 
             <div class="feature-card">
-                <div class="feature-icon">🗄️</div>
-                <div class="feature-title">Database SQLite WAL</div>
-                <div class="feature-desc">Penyimpanan riwayat transaksi & karantina kode unik 24 jam yang permanen.</div>
+                <div class="feature-icon">🛡️</div>
+                <div class="feature-title">Verifikasi Pembayaran</div>
+                <div class="feature-desc">Pemeriksaan dan pencocokan status transaksi secara cepat dan akurat.</div>
             </div>
 
             <div class="feature-card">
                 <div class="feature-icon">💻</div>
-                <div class="feature-title">Modern Admin Panel</div>
-                <div class="feature-desc">Portal manajemen sesi GoBiz, antrian webhook, & live system logs terminal.</div>
+                <div class="feature-title">Dashboard Manajemen</div>
+                <div class="feature-desc">Antarmuka kontrol admin terpadu untuk pemantauan dan pengelolaan.</div>
             </div>
         </div>
 
         <div class="action-buttons">
             <a href="/login" class="btn btn-primary">
-                🔑 Buka Portal Admin Panel
-            </a>
-            <a href="/health" class="btn btn-secondary">
-                💚 System Health Status
+                🔑 Masuk ke Portal Admin
             </a>
         </div>
 
         <footer>
-            GoPay Partner API Gateway &copy; 2026. Self-Hosted & Merchant Protected.
+            GoPay Payment Gateway &copy; 2026. All rights reserved.
         </footer>
     </div>
 
