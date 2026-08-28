@@ -11,9 +11,9 @@ const transactionController = require('../controllers/transactionController');
 const { renderAdminDashboard } = require('../views/adminDashboard');
 
 // Halaman Admin Portal Dashboard (/login)
-router.get('/login', (req, res) => {
+router.get('/login', async (req, res) => {
     const sessionFileExists = fs.existsSync(path.join(__dirname, '..', '.GOPAY_SESI_JANGAN_DIHAPUS.json'));
-    const dbSessionExists = Boolean(db.getMerchantSession());
+    const dbSessionExists = Boolean(await db.getMerchantSession());
     const sessionExists = sessionFileExists || dbSessionExists;
     const html = renderAdminDashboard(sessionExists);
     res.setHeader('Content-Type', 'text/html');

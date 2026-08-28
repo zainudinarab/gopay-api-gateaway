@@ -29,7 +29,7 @@ const createQris = async (req, res) => {
         }
 
         const QRIS_EXPIRY_MS = parseFloat(expiresHoursInput) * 60 * 60 * 1000;
-        const activeCodes = db.getActiveUniqueCodes(baseAmount, QRIS_EXPIRY_MS);
+        const activeCodes = await db.getActiveUniqueCodes(baseAmount, QRIS_EXPIRY_MS);
 
         let uniqueCode = 0;
         for (let i = 1; i <= 999; i++) {
@@ -48,7 +48,7 @@ const createQris = async (req, res) => {
         const qrisId = 'QR-' + Math.random().toString(36).substring(2, 10).toUpperCase();
         const trxId = 'TRX-' + Math.random().toString(36).substring(2, 10).toUpperCase();
 
-        const newOrder = db.saveOrder({
+        const newOrder = await db.saveOrder({
             qrisId,
             trxId,
             clientRefId,
@@ -93,7 +93,7 @@ const createQris = async (req, res) => {
 
 const getQrStatus = async (req, res) => {
     const qrisId = req.params.id;
-    const qris = db.getOrder(qrisId);
+    const qris = await db.getOrder(qrisId);
     if (!qris) {
         return res.json({ success: false, status: 'NOT_FOUND', message: 'QRIS tidak ditemukan' });
     }
@@ -103,7 +103,7 @@ const getQrStatus = async (req, res) => {
     }
 
     if (Date.now() > qris.expiresAt.getTime()) {
-        db.updateOrderStatus(qrisId, 'EXPIRED');
+        await db.updateOrderStatus(qrisId, 'EXPIRED');
         return res.json({ success: false, paid: false, status: 'EXPIRED', message: 'QRIS sudah kedaluwarsa' });
     }
 
@@ -122,7 +122,7 @@ const getQrStatus = async (req, res) => {
 const renderQrCheckout = async (req, res) => {
     const rawId = req.params.id || '';
     const qrisId = rawId.replace(/\.png$/, '');
-    const qris = db.getOrder(qrisId);
+    const qris = await db.getOrder(qrisId);
 
     if (!qris) {
         return res.status(404).send('<h2>404 - QRIS Tidak Ditemukan atau Sudah Kedaluwarsa</h2>');

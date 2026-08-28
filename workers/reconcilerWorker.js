@@ -2,9 +2,9 @@
 const db = require('../db');
 const { logActivity } = require('../services/loggerService');
 
-function reconcileUnclaimedTransactions() {
+async function reconcileUnclaimedTransactions() {
     try {
-        const unclaimed = db.getUnclaimedTransactions();
+        const unclaimed = await db.getUnclaimedTransactions();
         if (!unclaimed || unclaimed.length === 0) return;
 
         for (const tx of unclaimed) {
@@ -12,7 +12,7 @@ function reconcileUnclaimedTransactions() {
             const GRACE_PERIOD_MS = 2 * 60 * 60 * 1000;
             const TOLERANCE_MS = 12 * 60 * 60 * 1000;
 
-            const pendingOrders = db.getPendingOrdersForAmount(tx.amount).filter(order => {
+            const pendingOrders = (await db.getPendingOrdersForAmount(tx.amount)).filter(order => {
                 const txDate = new Date(txTimestamp);
                 const orderCreateDate = new Date(order.createdAt);
                 const orderCreateMs = orderCreateDate.getTime();
@@ -36,11 +36,11 @@ function reconcileUnclaimedTransactions() {
                     transaction_time: tx.transaction_time
                 };
 
-                db.updateClaimedTransactionOwner(tx.transaction_id, targetOrder.qrisId);
-                db.updateOrderStatus(targetOrder.qrisId, 'PAID', matched);
+                await db.updateClaimedTransactionOwner(tx.transaction_id, targetOrder.qrisId);
+                await db.updateOrderStatus(targetOrder.qrisId, 'PAID', matched);
 
                 if (targetOrder.webhookUrl && (targetOrder.webhookStatus === 'PENDING' || targetOrder.webhookStatus === 'NONE')) {
-                    db.enqueueWebhook({
+                    await db.enqueueWebhook({
                         qrisId: targetOrder.qrisId,
                         clientRefId: targetOrder.clientRefId,
                         webhookUrl: targetOrder.webhookUrl,
@@ -56,7 +56,7 @@ function reconcileUnclaimedTransactions() {
                             transaction: matched
                         }
                     });
-                    db.updateOrderWebhookStatus(targetOrder.qrisId, 'QUEUED');
+                    await db.updateOrderWebhookStatus(targetOrder.qrisId, 'QUEUED');
                 }
 
                 logActivity('SUCCESS', `[AUTO-RECONCILER] Transaksi ${tx.transaction_id} (Rp ${tx.amount}) berhasil dicocokkan & diklaim oleh QRIS ID ${targetOrder.qrisId}`);

@@ -2,9 +2,9 @@
 const db = require('../db');
 const { logActivity } = require('../services/loggerService');
 
-const getAllOrders = (req, res) => {
+const getAllOrders = async (req, res) => {
     const limit = parseInt(req.query.limit || '100', 10);
-    const orders = db.getAllOrders(limit);
+    const orders = await db.getAllOrders(limit);
     res.json({
         success: true,
         total: orders.length,
@@ -12,9 +12,9 @@ const getAllOrders = (req, res) => {
     });
 };
 
-const clearAllOrders = (req, res) => {
+const clearAllOrders = async (req, res) => {
     try {
-        db.clearAllOrders();
+        await db.clearAllOrders();
         logActivity('WARNING', '[DATABASE RESET] SELURUH data order, klaim transaksi, dan antrian webhook berhasil dibersihkan.');
         res.json({
             success: true,
@@ -26,7 +26,7 @@ const clearAllOrders = (req, res) => {
     }
 };
 
-const manualClaimOrder = (req, res) => {
+const manualClaimOrder = async (req, res) => {
     const qrisId = req.body?.qris_id || req.body?.qrisId || req.query?.qris_id;
     const txId = req.body?.transaction_id || req.body?.txId || req.query?.transaction_id;
     const notes = req.body?.notes || 'Manual Validation by Admin';
@@ -35,7 +35,7 @@ const manualClaimOrder = (req, res) => {
         return res.status(400).json({ success: false, message: 'Param qris_id wajib diisi' });
     }
 
-    const order = db.getOrder(qrisId);
+    const order = await db.getOrder(qrisId);
     if (!order) {
         return res.status(404).json({ success: false, message: 'Order QRIS tidak ditemukan di database' });
     }
@@ -51,7 +51,7 @@ const manualClaimOrder = (req, res) => {
     };
 
     if (txId) {
-        db.claimTransaction(txId, {
+        await db.claimTransaction(txId, {
             order_id: order.trxId,
             qrisId: order.qrisId,
             amount: order.amount,
@@ -61,10 +61,10 @@ const manualClaimOrder = (req, res) => {
         });
     }
 
-    db.updateOrderStatus(order.qrisId, 'PAID', matched);
+    await db.updateOrderStatus(order.qrisId, 'PAID', matched);
 
     if (order.webhookUrl) {
-        db.enqueueWebhook({
+        await db.enqueueWebhook({
             qrisId: order.qrisId,
             clientRefId: order.clientRefId,
             webhookUrl: order.webhookUrl,
@@ -80,7 +80,7 @@ const manualClaimOrder = (req, res) => {
                 transaction: matched
             }
         });
-        db.updateOrderWebhookStatus(order.qrisId, 'QUEUED');
+        await db.updateOrderWebhookStatus(order.qrisId, 'QUEUED');
     }
 
     logActivity('SUCCESS', `[MANUAL CLAIM] Order QRIS ID ${order.qrisId} berhasil divalidasi lunas secara manual oleh Admin!`);

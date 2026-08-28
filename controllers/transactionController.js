@@ -47,12 +47,12 @@ const getTransactions = async (req, res) => {
                 let amt = parseInt(tx.gross_amount || tx.real_gross_amount || 0, 10);
                 if (amt > 0 && amt % 100 === 0) amt = amt / 100;
                 const txId = tx.id || tx.order_id || tx.wallstreet_transaction_id;
-                let claimed = db.getClaimedTransaction(txId);
+                let claimed = await db.getClaimedTransaction(txId);
 
                 if (!claimed || !claimed.qrisId) {
                     const GRACE_PERIOD_MS = 2 * 60 * 60 * 1000;
                     const TOLERANCE_MS = 12 * 60 * 60 * 1000;
-                    const pendingOrders = db.getPendingOrdersForAmount(amt).filter(order => {
+                    const pendingOrders = (await db.getPendingOrdersForAmount(amt)).filter(order => {
                         const txDate = new Date(txMs);
                         const orderCreateDate = new Date(order.createdAt);
                         const orderCreateMs = orderCreateDate.getTime();
@@ -75,7 +75,7 @@ const getTransactions = async (req, res) => {
                             payment_type: tx.payment_type || tx.transaction_source || 'GOPAY_INSTORE',
                             transaction_time: tx.transaction_time || tx.settlement_time
                         };
-                        db.claimTransaction(txId, {
+                        await db.claimTransaction(txId, {
                             order_id: tx.order_id,
                             qrisId: targetOrder.qrisId,
                             amount: amt,
@@ -83,10 +83,10 @@ const getTransactions = async (req, res) => {
                             payment_type: matched.payment_type,
                             transaction_time: matched.transaction_time
                         });
-                        db.updateOrderStatus(targetOrder.qrisId, 'PAID', matched);
+                        await db.updateOrderStatus(targetOrder.qrisId, 'PAID', matched);
 
                         if (targetOrder.webhookUrl && (targetOrder.webhookStatus === 'PENDING' || targetOrder.webhookStatus === 'NONE')) {
-                            db.enqueueWebhook({
+                            await db.enqueueWebhook({
                                 qrisId: targetOrder.qrisId,
                                 clientRefId: targetOrder.clientRefId,
                                 webhookUrl: targetOrder.webhookUrl,
@@ -102,10 +102,10 @@ const getTransactions = async (req, res) => {
                                     transaction: matched
                                 }
                             });
-                            db.updateOrderWebhookStatus(targetOrder.qrisId, 'QUEUED');
+                            await db.updateOrderWebhookStatus(targetOrder.qrisId, 'QUEUED');
                         }
                         logActivity('SUCCESS', `[ON-THE-FLY RECONCILER] TRX ${txId} (Rp ${amt}) otomatis dicocokkan dengan QRIS ID ${targetOrder.qrisId}`);
-                        claimed = db.getClaimedTransaction(txId);
+                        claimed = await db.getClaimedTransaction(txId);
                     }
                 }
 

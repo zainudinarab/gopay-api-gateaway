@@ -5,7 +5,7 @@ const db = require('../db');
 const sessionManager = require('../sessionManager');
 const { logActivity } = require('../services/loggerService');
 
-function syncSessionWithDatabase() {
+async function syncSessionWithDatabase() {
     try {
         const sessionFile = path.join(__dirname, '..', '.GOPAY_SESI_JANGAN_DIHAPUS.json');
         
@@ -13,10 +13,10 @@ function syncSessionWithDatabase() {
             const fileData = fs.readFileSync(sessionFile, 'utf8').trim();
             if (fileData) {
                 const parsed = JSON.parse(fileData);
-                db.saveMerchantSession(parsed);
+                await db.saveMerchantSession(parsed);
             }
         } else {
-            const dbSession = db.getMerchantSession();
+            const dbSession = await db.getMerchantSession();
             if (dbSession) {
                 const str = typeof dbSession === 'object' ? JSON.stringify(dbSession, null, 2) : String(dbSession);
                 fs.writeFileSync(sessionFile, str, 'utf8');
@@ -30,11 +30,11 @@ function syncSessionWithDatabase() {
 
 async function autoRefreshSessionPeriodically() {
     try {
-        syncSessionWithDatabase();
+        await syncSessionWithDatabase();
         logActivity('INFO', '[SESSION KEEP-ALIVE] Memulai auto-refresh token berkala...');
         const refreshed = await sessionManager.refreshSession();
         if (refreshed) {
-            syncSessionWithDatabase();
+            await syncSessionWithDatabase();
             logActivity('SUCCESS', '[SESSION KEEP-ALIVE] Token GoBiz berhasil diperbarui.');
         }
     } catch (err) {
@@ -53,9 +53,9 @@ function startSessionWorker() {
     setInterval(syncSessionWithDatabase, 30 * 1000);
 
     // Clean expired claims tiap 1 jam
-    setInterval(() => {
+    setInterval(async () => {
         try {
-            db.cleanExpiredClaims(24 * 60 * 60 * 1000);
+            await db.cleanExpiredClaims(24 * 60 * 60 * 1000);
         } catch (err) {
             logActivity('ERROR', 'Gagal membersihkan klaim kedaluwarsa: ' + err.message);
         }

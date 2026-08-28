@@ -1,4 +1,4 @@
-// Database Abstraction Layer - Dual Engine: SQLite (Default Local) & PostgreSQL (DATABASE_URL)
+// Database Abstraction Layer - Complete Dual Engine: SQLite (Default Local) & PostgreSQL (DATABASE_URL)
 const path = require('path');
 const fs = require('fs');
 
@@ -181,24 +181,45 @@ module.exports = {
         return isPostgres;
     },
 
-    getActiveUniqueCodesForBaseAmount(baseAmount, cooldownMs = 24 * 60 * 60 * 1000) {
+    async getActiveUniqueCodesForBaseAmount(baseAmount, cooldownMs = 24 * 60 * 60 * 1000) {
         const threshold = Date.now() - cooldownMs;
         if (isPostgres) {
-            // Synchronous fallback or Postgres query
-            return [];
+            try {
+                const res = await pgPool.query(`SELECT unique_code FROM qris_orders WHERE base_amount = $1 AND created_at > $2`, [baseAmount, threshold]);
+                return res.rows.map(r => parseInt(r.unique_code, 10)).filter(c => c > 0);
+            } catch (e) {
+                console.error('[PG GET UNIQUE CODES ERROR]:', e.message);
+                return [];
+            }
         }
         const rows = stmtGetActiveUniqueCodes.all(baseAmount, threshold);
         return rows.map(r => r.unique_code).filter(c => c > 0);
     },
 
-    getActiveUniqueCodes(baseAmount, cooldownMs) {
-        return this.getActiveUniqueCodesForBaseAmount(baseAmount, cooldownMs);
+    async getActiveUniqueCodes(baseAmount, cooldownMs) {
+        return await this.getActiveUniqueCodesForBaseAmount(baseAmount, cooldownMs);
     },
 
-    getPendingOrdersForAmount(amount) {
+    async getPendingOrdersForAmount(amount) {
         const now = Date.now();
         if (isPostgres) {
-            return [];
+            try {
+                const res = await pgPool.query(`SELECT * FROM qris_orders WHERE amount = $1 AND status = 'PENDING' AND expires_at > $2 ORDER BY created_at DESC`, [amount, now]);
+                return res.rows.map(row => ({
+                    qrisId: row.qris_id,
+                    trxId: row.trx_id,
+                    clientRefId: row.client_ref_id,
+                    webhookUrl: row.webhook_url,
+                    amount: parseInt(row.amount, 10),
+                    baseAmount: parseInt(row.base_amount || row.amount, 10),
+                    uniqueCode: parseInt(row.unique_code || 0, 10),
+                    createdAt: new Date(parseInt(row.created_at, 10)),
+                    expiresAt: new Date(parseInt(row.expires_at, 10))
+                }));
+            } catch (e) {
+                console.error('[PG GET PENDING ORDERS ERROR]:', e.message);
+                return [];
+            }
         }
         const rows = stmtGetPendingOrdersForAmount.all(amount, now);
         return rows.map(row => ({
@@ -214,8 +235,31 @@ module.exports = {
         }));
     },
 
-    getAllOrders(limit = 100) {
-        if (isPostgres) return [];
+    async getAllOrders(limit = 100) {
+        if (isPostgres) {
+            try {
+                const res = await pgPool.query(`SELECT * FROM qris_orders ORDER BY created_at DESC LIMIT $1`, [limit]);
+                return res.rows.map(row => ({
+                    qrisId: row.qris_id,
+                    trxId: row.trx_id,
+                    clientRefId: row.client_ref_id,
+                    appId: row.app_id || 'default',
+                    webhookUrl: row.webhook_url,
+                    webhookStatus: row.webhook_status || 'NONE',
+                    amount: parseInt(row.amount, 10),
+                    baseAmount: parseInt(row.base_amount || row.amount, 10),
+                    uniqueCode: parseInt(row.unique_code || 0, 10),
+                    data: row.qris_code,
+                    status: row.status,
+                    createdAt: new Date(parseInt(row.created_at, 10)),
+                    expiresAt: new Date(parseInt(row.expires_at, 10)),
+                    transaction: row.transaction_data ? JSON.parse(row.transaction_data) : null
+                }));
+            } catch (e) {
+                console.error('[PG GET ALL ORDERS ERROR]:', e.message);
+                return [];
+            }
+        }
         const rows = stmtGetAllOrders.all(limit);
         return rows.map(row => ({
             qrisId: row.qris_id,
@@ -235,23 +279,27 @@ module.exports = {
         }));
     },
 
-    saveOrder(order) {
+    async saveOrder(order) {
         const qrisId = order.qrisId || 'QR-' + Math.random().toString(36).substring(2, 10).toUpperCase();
         const createdAt = order.createdAt ? (typeof order.createdAt === 'object' ? order.createdAt.getTime() : order.createdAt) : Date.now();
         const expiresAt = typeof order.expiresAt === 'object' ? order.expiresAt.getTime() : order.expiresAt;
         const qrisCode = order.data || order.qrisCode || order.qrisString || '';
 
         if (isPostgres) {
-            pgPool.query(`
-                INSERT INTO qris_orders (qris_id, trx_id, client_ref_id, app_id, webhook_url, webhook_status, amount, base_amount, unique_code, qris_code, status, created_at, expires_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-                ON CONFLICT (qris_id) DO UPDATE SET status = EXCLUDED.status, webhook_status = EXCLUDED.webhook_status
-            `, [
-                qrisId, order.trxId, order.clientRefId || order.refId || null, order.appId || 'default',
-                order.webhookUrl || null, order.webhookUrl ? 'PENDING' : 'NONE', order.amount,
-                order.baseAmount || order.amount, order.uniqueCode || 0, qrisCode, order.status || 'PENDING',
-                createdAt, expiresAt
-            ]).catch(e => console.error('[PG SAVE ORDER ERROR]:', e.message));
+            try {
+                await pgPool.query(`
+                    INSERT INTO qris_orders (qris_id, trx_id, client_ref_id, app_id, webhook_url, webhook_status, amount, base_amount, unique_code, qris_code, status, created_at, expires_at)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+                    ON CONFLICT (qris_id) DO UPDATE SET status = EXCLUDED.status, webhook_status = EXCLUDED.webhook_status
+                `, [
+                    qrisId, order.trxId, order.clientRefId || order.refId || null, order.appId || 'default',
+                    order.webhookUrl || null, order.webhookUrl ? 'PENDING' : 'NONE', order.amount,
+                    order.baseAmount || order.amount, order.uniqueCode || 0, qrisCode, order.status || 'PENDING',
+                    createdAt, expiresAt
+                ]);
+            } catch (e) {
+                console.error('[PG SAVE ORDER ERROR]:', e.message);
+            }
         } else {
             stmtInsertOrder.run({
                 qrisId,
@@ -282,8 +330,35 @@ module.exports = {
         };
     },
 
-    getOrder(qrisId) {
-        if (isPostgres) return null;
+    async getOrder(qrisId) {
+        if (isPostgres) {
+            try {
+                const res = await pgPool.query(`SELECT * FROM qris_orders WHERE qris_id = $1 OR trx_id = $1`, [qrisId]);
+                if (res.rows.length === 0) return null;
+                const row = res.rows[0];
+                return {
+                    qrisId: row.qris_id,
+                    trxId: row.trx_id,
+                    clientRefId: row.client_ref_id,
+                    appId: row.app_id || 'default',
+                    webhookUrl: row.webhook_url,
+                    webhookStatus: row.webhook_status,
+                    amount: parseInt(row.amount, 10),
+                    baseAmount: parseInt(row.base_amount || row.amount, 10),
+                    uniqueCode: parseInt(row.unique_code || 0, 10),
+                    data: row.qris_code,
+                    qrisCode: row.qris_code,
+                    qrisString: row.qris_code,
+                    status: row.status,
+                    createdAt: new Date(parseInt(row.created_at, 10)),
+                    expiresAt: new Date(parseInt(row.expires_at, 10)),
+                    transaction: row.transaction_data ? JSON.parse(row.transaction_data) : null
+                };
+            } catch (e) {
+                console.error('[PG GET ORDER ERROR]:', e.message);
+                return null;
+            }
+        }
         const row = stmtGetOrder.get(qrisId);
         if (!row) return null;
         return {
@@ -306,11 +381,15 @@ module.exports = {
         };
     },
 
-    updateOrderStatus(qrisId, status, transactionData = null) {
+    async updateOrderStatus(qrisId, status, transactionData = null) {
         if (isPostgres) {
-            pgPool.query(`UPDATE qris_orders SET status = $1, transaction_data = $2 WHERE qris_id = $3`, [
-                status, transactionData ? JSON.stringify(transactionData) : null, qrisId
-            ]).catch(e => console.error('[PG UPDATE STATUS ERROR]:', e.message));
+            try {
+                await pgPool.query(`UPDATE qris_orders SET status = $1, transaction_data = $2 WHERE qris_id = $3`, [
+                    status, transactionData ? JSON.stringify(transactionData) : null, qrisId
+                ]);
+            } catch (e) {
+                console.error('[PG UPDATE STATUS ERROR]:', e.message);
+            }
         } else {
             stmtUpdateOrderStatus.run({
                 qrisId,
@@ -320,17 +399,41 @@ module.exports = {
         }
     },
 
-    updateOrderWebhookStatus(qrisId, webhookStatus) {
+    async updateOrderWebhookStatus(qrisId, webhookStatus) {
         if (isPostgres) {
-            pgPool.query(`UPDATE qris_orders SET webhook_status = $1 WHERE qris_id = $2`, [webhookStatus, qrisId])
-                .catch(e => console.error('[PG UPDATE WEBHOOK STATUS ERROR]:', e.message));
+            try {
+                await pgPool.query(`UPDATE qris_orders SET webhook_status = $1 WHERE qris_id = $2`, [webhookStatus, qrisId]);
+            } catch (e) {
+                console.error('[PG UPDATE WEBHOOK STATUS ERROR]:', e.message);
+            }
         } else {
             stmtUpdateOrderWebhookStatus.run(webhookStatus, qrisId);
         }
     },
 
-    getClaimedTransaction(txId) {
-        if (isPostgres) return null;
+    async getClaimedTransaction(txId) {
+        if (isPostgres) {
+            try {
+                const res = await pgPool.query(`SELECT * FROM claimed_transactions WHERE transaction_id = $1`, [txId]);
+                if (res.rows.length === 0) return null;
+                const row = res.rows[0];
+                return {
+                    txId: row.transaction_id,
+                    qrisId: row.qris_id,
+                    qris_id: row.qris_id,
+                    trxId: row.qris_id,
+                    orderId: row.order_id,
+                    amount: parseInt(row.amount, 10),
+                    payerIssuer: row.payer_issuer,
+                    paymentType: row.payment_type,
+                    transactionTime: row.transaction_time,
+                    claimedAt: parseInt(row.claimed_at, 10)
+                };
+            } catch (e) {
+                console.error('[PG GET CLAIMED TX ERROR]:', e.message);
+                return null;
+            }
+        }
         const row = stmtGetClaimedTx.get(txId);
         if (!row) return null;
         let publicQrisId = row.qris_id;
@@ -352,7 +455,7 @@ module.exports = {
         };
     },
 
-    claimTransaction(txId, claim) {
+    async claimTransaction(txId, claim) {
         let publicQrisId = claim.qrisId || null;
         if (!isPostgres && publicQrisId) {
             const orderRow = stmtGetOrderByTrxId.get(publicQrisId, publicQrisId);
@@ -360,15 +463,19 @@ module.exports = {
         }
 
         if (isPostgres) {
-            pgPool.query(`
-                INSERT INTO claimed_transactions (transaction_id, order_id, qris_id, amount, payer_issuer, payment_type, transaction_time, claimed_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                ON CONFLICT (transaction_id) DO UPDATE SET qris_id = EXCLUDED.qris_id
-            `, [
-                txId, claim.order_id || null, publicQrisId, claim.amount,
-                claim.payer_issuer || 'GoPay / Bank', claim.payment_type || 'QRIS',
-                claim.transaction_time || null, Date.now()
-            ]).catch(e => console.error('[PG CLAIM TX ERROR]:', e.message));
+            try {
+                await pgPool.query(`
+                    INSERT INTO claimed_transactions (transaction_id, order_id, qris_id, amount, payer_issuer, payment_type, transaction_time, claimed_at)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                    ON CONFLICT (transaction_id) DO UPDATE SET qris_id = EXCLUDED.qris_id
+                `, [
+                    txId, claim.order_id || null, publicQrisId, claim.amount,
+                    claim.payer_issuer || 'GoPay / Bank', claim.payment_type || 'QRIS',
+                    claim.transaction_time || null, Date.now()
+                ]);
+            } catch (e) {
+                console.error('[PG CLAIM TX ERROR]:', e.message);
+            }
         } else {
             stmtClaimTx.run({
                 txId,
@@ -383,27 +490,35 @@ module.exports = {
         }
     },
 
-    cleanExpiredClaims(maxAgeMs = 24 * 60 * 60 * 1000) {
+    async cleanExpiredClaims(maxAgeMs = 24 * 60 * 60 * 1000) {
         const threshold = Date.now() - maxAgeMs;
         if (isPostgres) {
-            pgPool.query(`DELETE FROM claimed_transactions WHERE claimed_at < $1`, [threshold]).catch(e => {});
+            try {
+                await pgPool.query(`DELETE FROM claimed_transactions WHERE claimed_at < $1`, [threshold]);
+            } catch (e) {}
         } else {
             stmtCleanExpiredClaims.run(threshold);
         }
     },
 
-    enqueueWebhook(data) {
+    async enqueueWebhook(data) {
         const now = Date.now();
         if (isPostgres) {
-            pgPool.query(`
-                INSERT INTO webhook_queue (qris_id, client_ref_id, webhook_url, payload, attempts, max_attempts, status, created_at, next_attempt_at)
-                VALUES ($1, $2, $3, $4, 0, 3, 'PENDING', $5, $6)
-            `, [
-                data.qrisId, data.clientRefId || null, data.webhookUrl,
-                typeof data.payload === 'object' ? JSON.stringify(data.payload) : data.payload,
-                now, now
-            ]).catch(e => console.error('[PG ENQUEUE WEBHOOK ERROR]:', e.message));
-            return 1;
+            try {
+                const res = await pgPool.query(`
+                    INSERT INTO webhook_queue (qris_id, client_ref_id, webhook_url, payload, attempts, max_attempts, status, created_at, next_attempt_at)
+                    VALUES ($1, $2, $3, $4, 0, 3, 'PENDING', $5, $6)
+                    RETURNING id
+                `, [
+                    data.qrisId, data.clientRefId || null, data.webhookUrl,
+                    typeof data.payload === 'object' ? JSON.stringify(data.payload) : data.payload,
+                    now, now
+                ]);
+                return res.rows[0].id;
+            } catch (e) {
+                console.error('[PG ENQUEUE WEBHOOK ERROR]:', e.message);
+                return 1;
+            }
         } else {
             const info = stmtEnqueueWebhook.run({
                 qrisId: data.qrisId,
@@ -417,9 +532,29 @@ module.exports = {
         }
     },
 
-    getPendingWebhooks(limit = 10) {
-        if (isPostgres) return [];
+    async getPendingWebhooks(limit = 10) {
         const now = Date.now();
+        if (isPostgres) {
+            try {
+                const res = await pgPool.query(`SELECT * FROM webhook_queue WHERE status = 'PENDING' AND next_attempt_at <= $1 ORDER BY id ASC LIMIT $2`, [now, limit]);
+                return res.rows.map(r => ({
+                    id: r.id,
+                    qrisId: r.qris_id,
+                    clientRefId: r.client_ref_id,
+                    webhookUrl: r.webhook_url,
+                    payload: JSON.parse(r.payload),
+                    attempts: parseInt(r.attempts, 10),
+                    maxAttempts: parseInt(r.max_attempts, 10),
+                    status: r.status,
+                    lastError: r.last_error,
+                    createdAt: parseInt(r.created_at, 10),
+                    nextAttemptAt: parseInt(r.next_attempt_at, 10)
+                }));
+            } catch (e) {
+                console.error('[PG GET PENDING WEBHOOKS ERROR]:', e.message);
+                return [];
+            }
+        }
         const rows = stmtGetPendingWebhooks.all(now, limit);
         return rows.map(r => ({
             id: r.id,
@@ -436,14 +571,17 @@ module.exports = {
         }));
     },
 
-    updateWebhookAttempt(id, status, lastError = null, nextAttemptAt = Date.now()) {
+    async updateWebhookAttempt(id, status, lastError = null, nextAttemptAt = Date.now()) {
         if (isPostgres) {
-            pgPool.query(`
-                UPDATE webhook_queue 
-                SET attempts = attempts + 1, status = $1, last_error = $2, next_attempt_at = $3
-                WHERE id = $4
-            `, [status, lastError ? String(lastError) : null, nextAttemptAt, id])
-            .catch(e => console.error('[PG UPDATE WEBHOOK ATTEMPT ERROR]:', e.message));
+            try {
+                await pgPool.query(`
+                    UPDATE webhook_queue 
+                    SET attempts = attempts + 1, status = $1, last_error = $2, next_attempt_at = $3
+                    WHERE id = $4
+                `, [status, lastError ? String(lastError) : null, nextAttemptAt, id]);
+            } catch (e) {
+                console.error('[PG UPDATE WEBHOOK ATTEMPT ERROR]:', e.message);
+            }
         } else {
             const row = sqliteDb.prepare(`SELECT attempts FROM webhook_queue WHERE id = ?`).get(id);
             const attempts = row ? row.attempts + 1 : 1;
@@ -457,8 +595,28 @@ module.exports = {
         }
     },
 
-    getAllWebhooks(limit = 50) {
-        if (isPostgres) return [];
+    async getAllWebhooks(limit = 50) {
+        if (isPostgres) {
+            try {
+                const res = await pgPool.query(`SELECT * FROM webhook_queue ORDER BY id DESC LIMIT $1`, [limit]);
+                return res.rows.map(r => ({
+                    id: r.id,
+                    qrisId: r.qris_id,
+                    clientRefId: r.client_ref_id,
+                    webhookUrl: r.webhook_url,
+                    payload: JSON.parse(r.payload),
+                    attempts: parseInt(r.attempts, 10),
+                    maxAttempts: parseInt(r.max_attempts, 10),
+                    status: r.status,
+                    lastError: r.last_error,
+                    createdAt: new Date(parseInt(r.created_at, 10)),
+                    nextAttemptAt: new Date(parseInt(r.next_attempt_at, 10))
+                }));
+            } catch (e) {
+                console.error('[PG GET ALL WEBHOOKS ERROR]:', e.message);
+                return [];
+            }
+        }
         const rows = stmtGetAllWebhooks.all(limit);
         return rows.map(r => ({
             id: r.id,
@@ -475,17 +633,36 @@ module.exports = {
         }));
     },
 
-    clearAllOrders() {
+    async clearAllOrders() {
         if (isPostgres) {
-            pgPool.query("DELETE FROM qris_orders; DELETE FROM claimed_transactions; DELETE FROM webhook_queue;");
+            try {
+                await pgPool.query("DELETE FROM qris_orders; DELETE FROM claimed_transactions; DELETE FROM webhook_queue;");
+            } catch (e) {}
         } else {
             sqliteDb.exec("DELETE FROM qris_orders; DELETE FROM claimed_transactions; DELETE FROM webhook_queue;");
         }
         return true;
     },
 
-    getUnclaimedTransactions() {
-        if (isPostgres) return [];
+    async getUnclaimedTransactions() {
+        if (isPostgres) {
+            try {
+                const res = await pgPool.query(`SELECT * FROM claimed_transactions WHERE qris_id IS NULL OR qris_id = ''`);
+                return res.rows.map(r => ({
+                    transaction_id: r.transaction_id,
+                    order_id: r.order_id,
+                    qris_id: r.qris_id,
+                    amount: parseInt(r.amount, 10),
+                    payer_issuer: r.payer_issuer,
+                    payment_type: r.payment_type,
+                    transaction_time: r.transaction_time,
+                    claimed_at: parseInt(r.claimed_at, 10)
+                }));
+            } catch (e) {
+                console.error('[PG GET UNCLAIMED TX ERROR]:', e.message);
+                return [];
+            }
+        }
         const rows = sqliteDb.prepare(`SELECT * FROM claimed_transactions WHERE qris_id IS NULL OR qris_id = ''`).all();
         return rows.map(r => ({
             transaction_id: r.transaction_id,
@@ -499,22 +676,28 @@ module.exports = {
         }));
     },
 
-    updateClaimedTransactionOwner(transactionId, qrisId) {
+    async updateClaimedTransactionOwner(transactionId, qrisId) {
         if (isPostgres) {
-            pgPool.query(`UPDATE claimed_transactions SET qris_id = $1 WHERE transaction_id = $2`, [qrisId, transactionId]);
+            try {
+                await pgPool.query(`UPDATE claimed_transactions SET qris_id = $1 WHERE transaction_id = $2`, [qrisId, transactionId]);
+            } catch (e) {}
         } else {
             sqliteDb.prepare(`UPDATE claimed_transactions SET qris_id = ? WHERE transaction_id = ?`).run(qrisId, transactionId);
         }
     },
 
-    saveMerchantSession(sessionData, key = 'gobiz_primary') {
+    async saveMerchantSession(sessionData, key = 'gobiz_primary') {
         const str = typeof sessionData === 'object' ? JSON.stringify(sessionData, null, 2) : String(sessionData);
         if (isPostgres) {
-            pgPool.query(`
-                INSERT INTO merchant_sessions (session_key, session_data, updated_at)
-                VALUES ($1, $2, $3)
-                ON CONFLICT (session_key) DO UPDATE SET session_data = EXCLUDED.session_data, updated_at = EXCLUDED.updated_at
-            `, [key, str, Date.now()]).catch(e => console.error('[PG SAVE SESSION ERROR]:', e.message));
+            try {
+                await pgPool.query(`
+                    INSERT INTO merchant_sessions (session_key, session_data, updated_at)
+                    VALUES ($1, $2, $3)
+                    ON CONFLICT (session_key) DO UPDATE SET session_data = EXCLUDED.session_data, updated_at = EXCLUDED.updated_at
+                `, [key, str, Date.now()]);
+            } catch (e) {
+                console.error('[PG SAVE SESSION ERROR]:', e.message);
+            }
         } else {
             sqliteDb.prepare(`
                 INSERT OR REPLACE INTO merchant_sessions (session_key, session_data, updated_at)
@@ -523,10 +706,21 @@ module.exports = {
         }
     },
 
-    getMerchantSession(key = 'gobiz_primary') {
+    async getMerchantSession(key = 'gobiz_primary') {
         if (isPostgres) {
-            // For PostgreSQL, async fetch or sync fallback
-            return null;
+            try {
+                const res = await pgPool.query(`SELECT session_data FROM merchant_sessions WHERE session_key = $1`, [key]);
+                if (res.rows.length === 0 || !res.rows[0].session_data) return null;
+                const str = res.rows[0].session_data;
+                try {
+                    return JSON.parse(str);
+                } catch (e) {
+                    return str;
+                }
+            } catch (e) {
+                console.error('[PG GET SESSION ERROR]:', e.message);
+                return null;
+            }
         }
         const row = sqliteDb.prepare(`SELECT session_data FROM merchant_sessions WHERE session_key = ?`).get(key);
         if (!row || !row.session_data) return null;
@@ -537,9 +731,11 @@ module.exports = {
         }
     },
 
-    deleteMerchantSession(key = 'gobiz_primary') {
+    async deleteMerchantSession(key = 'gobiz_primary') {
         if (isPostgres) {
-            pgPool.query(`DELETE FROM merchant_sessions WHERE session_key = $1`, [key]).catch(e => {});
+            try {
+                await pgPool.query(`DELETE FROM merchant_sessions WHERE session_key = $1`, [key]);
+            } catch (e) {}
         } else {
             sqliteDb.prepare(`DELETE FROM merchant_sessions WHERE session_key = ?`).run(key);
         }
