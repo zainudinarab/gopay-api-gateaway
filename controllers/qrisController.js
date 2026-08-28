@@ -24,16 +24,13 @@ const createQris = async (req, res) => {
         }
 
         const staticQR = process.env.GOPAY_STATIC_QRIS;
-        if (!staticQR || staticQR.includes('YOUR_GOPAY_STATIC_QRIS') || staticQR.trim() === '') {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'GOPAY_STATIC_QRIS belum dikonfigurasi di .env. Silakan buka file .env dan isi GOPAY_STATIC_QRIS dengan string QRIS statis dari GoBiz/toko Anda.' 
-            });
+        if (!staticQR) {
+            return res.status(500).json({ success: false, message: 'GOPAY_STATIC_QRIS belum dikonfigurasi di file .env' });
         }
 
         const QRIS_EXPIRY_MS = parseFloat(expiresHoursInput) * 60 * 60 * 1000;
         const activeCodes = db.getActiveUniqueCodes(baseAmount, QRIS_EXPIRY_MS);
-        
+
         let uniqueCode = 0;
         for (let i = 1; i <= 999; i++) {
             if (!activeCodes.includes(i)) {
