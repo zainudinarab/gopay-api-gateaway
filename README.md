@@ -15,31 +15,8 @@ API Gateway self-hosted berbasis Node.js & SQLite untuk otomatisasi cek transaks
 ---
 
 > [!TIP]
-> 📣 **UPDATE TERBARU: Modern Admin Control Panel, Live System Log Monitor & Strict API Access Security**
-> Gateway ini dilengkapi dengan **Dashboard Control Panel dengan Navigasi Sidebar**, **Live Terminal System Logs Monitor (`/api/logs`)**, **Pemisahan Ketat Akses Admin (`ADMIN_PASSWORD`) vs Client (`APP_SECRET`)**, serta **Background Webhook Queue Worker dengan Retry Otomatis (3x)**!
-
-> [!CAUTION]
-> 🚨 **PERSYARATAN DEPLOYMENT (VPS / cPanel / Docker)**
-> Gateway ini **dapat di-deploy di VPS Linux, Docker Container, atau cPanel Hosting** yang memiliki penyimpanan permanen 24/7.
-> **DILARANG MENGGUNAKAN HOSTING SERVERLESS GRATISAN** (seperti Render Free, Vercel, Netlify) karena container akan *sleep* dan menghapus file sesi (`.GOPAY_SESI_JANGAN_DIHAPUS.json`), yang mengakibatkan sesi hangus.
-
----
-
-## ✨ Fitur Utama
-
-- 💻 **Modern Admin Control Panel UI (`/login`)** — Antarmuka dashboard panel dengan navigasi sidebar kiri, top status bar, kartu statistik KPI, dan modal interaktif.
-- 📺 **Live System Log Monitor (`/api/logs`)** — Konsol terminal live real-time di Admin Panel untuk memantau log aktivitas background worker (Reconciler, Webhook Queue, Session Keep-Alive), API request, dan error.
-- 🔒 **Proteksi Akses Keamanan Ketat (`ADMIN_PASSWORD` vs `APP_SECRET`)** — Pemisahan hak akses penuh Admin (`ADMIN_PASSWORD`) dan kunci aplikasi klien (`APP_SECRET`). Mencegah privilege escalation dari pihak ketiga.
-- 🚪 **Logout Admin Portal vs Hapus Sesi GoPay** — Pemisahan yang jelas antara keluar dari halaman web portal admin (`lockPortalAdmin`) dan memutuskan sesi merchant GoPay (`logoutSession`).
-- 🗄️ **Database SQLite Permanen (`gateway.db`)** — Operasi dalam mode WAL (Write-Ahead Logging). Riwayat order & klaim pembayaran tersimpan utuh walau server di-restart.
-- 🔢 **Kode Unik Kecil (1–99 Rp) dengan Karantina 24 Jam** — 100% bebas konflik & anti-tertukar. Kode unik dikarantina 24 jam per nominal dasar.
-- ⚡ **Cache Mutasi 10 Detik & Single-Flight Debouncing** — Panggilan ke GoJek API dibatasi maksimal 1x per 10 detik (~6x/menit), bebas dari rate limit & anti-banned.
-- ⏰ **Proteksi Expiry Window + Grace Period (+2 Menit)** — Transaksi telat (>5m) diabaikan agar tidak salah masuk ke order pembeli baru.
-- 🧾 **QRIS Dinamis (EMVCo) & Gambar Base64 (`qris_image_base64`)** — Mengembalikan string EMVCo, URL checkout, gambar PNG, dan Data URI Base64 siap pakai.
-- 🤖 **Background Auto-Reconciler Worker** — Secara otomatis mencocokkan transaksi tanpa pemilik (`qris_id: null`) dengan order `PENDING` di background setiap 5 detik tanpa perlu user refresh web!
-- 🛠️ **Validasi Manual Admin & Jodohkan Transaksi** — Memungkinkan Admin memvalidasi order `PENDING`/`EXPIRED` atau menjodohkan ID transaksi GoJek secara manual lewat Dashboard Admin dan otomatis memicu pengiriman Webhook.
-- 🔔 **Background Webhook Queue Worker dengan Retry Engine (3x)** — Mengirim notifikasi HTTP POST otomatis ke Pihak Ketiga saat status `PAID` dengan percobaan ulang 3x jika server Pihak Ketiga sempat down.
-- 🔖 **ID Transaksi Pihak Ketiga (`client_ref_id`)** — Menyimpan ID Invoice Pihak Ketiga dan mengembalikannya pada notifikasi Webhook.
+> 📣 **DOKUMENTASI LENGKAP ENDPOINTS REST API**
+> Gateway ini menyediakan API lengkap untuk pencetakan QRIS, polling frontend, callback webhook, manajemen order, mutasi GoJek, serta administrasi sesi GoBiz.
 
 ---
 
@@ -59,35 +36,45 @@ ADMIN_PASSWORD=admin123456
 
 ---
 
-## 🌐 Dokumentasi API Endpoints
+## 🌐 Dokumentasi Lengkap API Endpoints
 
-### 1. Buat QRIS Dinamis (`POST` / `GET /create-qris`)
-Setiap request **wajib** menyertakan parameter `app_id` (yang terdaftar di `ALLOWED_APP_IDS`) dan `app_secret` (`APP_SECRET`).
+### 🔐 Autentikasi Request Client
+Setiap request ke endpoint bertanda **[Client API]** wajib melampirkan:
+- `app_id` (Wajib terdaftar pada `ALLOWED_APP_IDS` di `.env`)
+- `app_secret` (Sesuai `APP_SECRET` di `.env`)
 
-Headers (opsional jika dikirim via Header):
-- `x-app-id: App1`
-- `x-app-secret: secret123`
+*Parameter dapat dikirim melalui **HTTP Headers** (`x-app-id` & `x-app-secret`), **JSON Body**, atau **URL Query Parameters** (`api_key` / `app_secret`).*
 
+---
+
+### 🛍️ 1. API Transaksi & QRIS Client
+
+#### **A. Buat QRIS Dinamis (`POST` / `GET /create-qris`)** [Client API]
+Mencetak QRIS EMVCo dinamis dengan penguncian nominal & kode unik otomatis.
+
+- **Headers**:
+  - `x-app-id: App1`
+  - `x-app-secret: secret123`
+- **Request Body (JSON)**:
 ```json
-// Request Body / Query Params
 {
   "app_id": "App1",
   "app_secret": "secret123",
   "amount": 10000,
-  "ref_id": "INV-20260826-0001",
-  "webhook_url": "https://pihak-ketiga.com/callback"
+  "ref_id": "INV-20260828-0001",
+  "webhook_url": "https://website-anda.com/api/callback",
+  "expires_in_hours": 12
 }
 ```
-
+- **Response Success (200 OK)**:
 ```json
-// Response JSON
 {
   "success": true,
   "data": {
     "qris_id": "QR-9C6TS3RC",
     "trx_id": "TRX-4UR9CRCC",
     "app_id": "App1",
-    "client_ref_id": "INV-20260826-0001",
+    "client_ref_id": "INV-20260828-0001",
     "base_amount": 10000,
     "unique_code": 14,
     "amount": 10014,
@@ -95,8 +82,8 @@ Headers (opsional jika dikirim via Header):
     "qris_image_url": "http://localhost:3000/qr/QR-9C6TS3RC.png",
     "qris_image_base64": "data:image/png;base64,iVBORw0KG...",
     "checkout_url": "http://localhost:3000/qr/QR-9C6TS3RC",
-    "webhook_url": "https://pihak-ketiga.com/callback",
-    "expires_at": "2026-08-28T01:46:12.442Z",
+    "webhook_url": "https://website-anda.com/api/callback",
+    "expires_at": "2026-08-28T12:00:00.000Z",
     "expires_in_hours": 12
   }
 }
@@ -104,11 +91,20 @@ Headers (opsional jika dikirim via Header):
 
 ---
 
-### 2. Cek Public Status untuk Frontend Polling (`GET /api/qr-status/:qris_id`)
-*TIDAK MEMERLUKAN APP_SECRET / APP_ID* (Aman untuk Frontend Web/Mobile App).
+#### **B. Cek Public Status untuk Frontend Polling (`GET /api/qr-status/:qris_id`)** [Public Endpoint]
+*Aman dipanggil langsung dari Frontend Web/Mobile tanpa perlu `app_secret`.*
 
+- **URL Parameters**: `:qris_id` (Contoh: `/api/qr-status/QR-9C6TS3RC`)
+- **Response Success (Status PENDING)**:
 ```json
-// Response PAID
+{
+  "success": true,
+  "paid": false,
+  "status": "PENDING"
+}
+```
+- **Response Success (Status PAID)**:
+```json
 {
   "success": true,
   "paid": true,
@@ -117,22 +113,43 @@ Headers (opsional jika dikirim via Header):
     "transaction_id": "01a03c85-...",
     "order_id": "QRIS-042026...",
     "amount": 10014,
-    "payer_issuer": "GoPay / Bank",
+    "payer_issuer": "AirPay Shopee / BCA / GoPay",
     "payment_type": "QRIS",
-    "transaction_time": "2026-08-26T14:00:15+07:00"
+    "transaction_time": "2026-08-28T10:15:00+07:00"
   }
 }
 ```
 
 ---
 
-### 3. Format Webhook Callback Payload ke Pihak Ketiga (saat LUNAS)
+#### **C. Cek Status Pembayaran Manual Backend (`GET` / `POST /api/check-payment`)** [Client API]
+Memeriksa status pembayaran transaksi dari backend Anda.
+
+- **Query Params / Body**: `qris_id` atau `trx_id` atau `ref_id`
+- **Headers / Query**: `api_key=secret123` & `app_id=App1`
+- **Response Success**:
+```json
+{
+  "success": true,
+  "paid": true,
+  "status": "PAID",
+  "amount": 10014,
+  "client_ref_id": "INV-20260828-0001",
+  "paid_at": "2026-08-28T10:15:00+07:00"
+}
+```
+
+---
+
+#### **D. Skema Payload Notifikasi Webhook (`webhook_url`)** [Callback Server]
+Dipanggil otomatis via HTTP POST ke `webhook_url` Anda begitu status pembayaran menjadi `PAID`:
+
 ```json
 {
   "event": "payment.success",
   "qris_id": "QR-9C6TS3RC",
   "trx_id": "TRX-4UR9CRCC",
-  "client_ref_id": "INV-20260826-0001",
+  "client_ref_id": "INV-20260828-0001",
   "status": "PAID",
   "amount": 10014,
   "base_amount": 10000,
@@ -141,19 +158,164 @@ Headers (opsional jika dikirim via Header):
     "transaction_id": "01a03c85-...",
     "order_id": "QRIS-042026...",
     "amount": 10014,
-    "payer_issuer": "GoPay / Bank",
+    "payer_issuer": "AirPay Shopee / BCA",
     "payment_type": "QRIS",
-    "transaction_time": "2026-08-26T14:00:15+07:00"
+    "transaction_time": "2026-08-28T10:15:00+07:00"
   }
 }
 ```
 
 ---
 
-### 4. Manajemen Admin Panel (`http://localhost:3000/login`)
-- **Layar Kunci**: Masukkan `ADMIN_PASSWORD` (default: `admin123456`).
-- **Sidebar Navigation**: Akses Order QRIS, Sesi GoBiz, Antrian Webhook, Mutasi GoJek, Live System Logs, & Docs API.
-- **Input Nomor HP & OTP**: Aktivasi Sesi GoBiz Merchant secara langsung via Web UI.
+### 📦 2. API Manajemen Order & Transaksi
+
+#### **A. Mengambil Seluruh Order QRIS (`GET /api/orders`)** [Client/Admin API]
+- **Query Params**: `limit=50&api_key=secret123`
+- **Response Success**:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "qrisId": "QR-9C6TS3RC",
+      "trxId": "TRX-4UR9CRCC",
+      "appId": "App1",
+      "clientRefId": "INV-20260828-0001",
+      "amount": 10014,
+      "status": "PAID",
+      "webhookStatus": "SUCCESS",
+      "createdAt": "2026-08-28T10:00:00.000Z"
+    }
+  ]
+}
+```
+
+---
+
+#### **B. Validasi Manual / Jodohkan Transaksi (`POST /api/orders/manual-claim`)** [Admin API]
+Validasi lunas manual untuk order `PENDING` atau menghubungkan ID transaksi GoJek.
+
+- **Headers**: `x-api-key: admin123456`
+- **Body JSON**:
+```json
+{
+  "qris_id": "QR-9C6TS3RC",
+  "transaction_id": "01a03c85-...",
+  "notes": "Klaim manual via Admin"
+}
+```
+- **Response Success**:
+```json
+{
+  "success": true,
+  "message": "Order QR-9C6TS3RC berhasil divalidasi LUNAS secara manual!"
+}
+```
+
+---
+
+#### **C. Reset / Hapus Seluruh Data Order (`POST` / `DELETE /api/orders/clear`)** [Admin API]
+Menghapus seluruh riwayat order QRIS dan antrian webhook di database SQLite.
+
+- **Headers**: `x-api-key: admin123456`
+- **Response Success**:
+```json
+{
+  "success": true,
+  "message": "Seluruh data order QRIS berhasil dihapus dari database!"
+}
+```
+
+---
+
+### 💸 3. API Mutasi GoJek & System Logs
+
+#### **A. Mengambil Mutasi Masuk GoJek (`GET /transactions`)** [Admin API]
+- **Query Params**: `pageSize=50&api_key=admin123456`
+- **Response Success**:
+```json
+{
+  "success": true,
+  "total_amount": 500000,
+  "data": {
+    "transactions": [
+      {
+        "transaction_id": "01a03c85-...",
+        "order_id": "QRIS-042026...",
+        "issuer": "AirPay Shopee",
+        "amount": 10014,
+        "status": "success",
+        "time": "2026-08-28T10:15:00+07:00",
+        "qris_id": "QR-9C6TS3RC"
+      }
+    ]
+  }
+}
+```
+
+---
+
+#### **B. Mengambil Log Antrian Webhook (`GET /api/webhooks`)** [Admin API]
+- **Query Params**: `limit=50&api_key=admin123456`
+- **Response Success**:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "qrisId": "QR-9C6TS3RC",
+      "webhookUrl": "https://website-anda.com/api/callback",
+      "attempts": 1,
+      "maxAttempts": 3,
+      "status": "SUCCESS",
+      "lastError": null
+    }
+  ]
+}
+```
+
+---
+
+#### **C. Real-Time System Log Monitor (`GET /api/logs`)** [Admin API]
+- **Query Params**: `api_key=admin123456`
+- **Response Success**:
+```json
+{
+  "success": true,
+  "logs": [
+    {
+      "timestamp": "2026-08-28T10:15:00.000Z",
+      "level": "INFO",
+      "message": "QRIS Dinamis dibuat | TRX-ID: TRX-4UR9CRCC | App-ID: App1"
+    }
+  ]
+}
+```
+
+---
+
+### 🔑 4. API Autentikasi Sesi GoBiz Merchant
+
+#### **A. Verifikasi Password Admin Portal (`POST /api/login/admin-auth`)**
+```json
+// Body: { "admin_password": "admin123456" }
+{ "success": true, "message": "Password Admin Benar" }
+```
+
+#### **B. Request OTP SMS/WA GoBiz (`POST /api/login/request-otp`)**
+```json
+// Headers: x-admin-password: admin123456
+// Body: { "phone": "08123456789" }
+{ "success": true, "message": "Kode OTP berhasil dikirimkan via SMS/WA!" }
+```
+
+#### **C. Verifikasi OTP GoBiz (`POST /api/login/verify-otp`)**
+```json
+// Headers: x-admin-password: admin123456
+// Body: { "otp_code": "1234" }
+{ "success": true, "message": "Sesi GoPay Merchant Berhasil Diaktifkan!" }
+```
 
 ---
 

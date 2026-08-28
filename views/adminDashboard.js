@@ -830,17 +830,60 @@ function renderAdminDashboard(sessionExists) {
 
                         <!-- Card 3: Check Status Endpoint -->
                         <div style="background: #111827; border: 1px solid var(--border-color); border-radius: 14px; padding: 20px; margin-bottom: 20px;">
-                            <h4 style="font-size: 15px; font-weight: 700; color: var(--accent-amber); margin-bottom: 10px;">
+                            <h4 style="font-size: 15px; font-weight: 700; color: var(--accent-cyan); margin-bottom: 10px;">
                                 🔍 3. Public Polling Status Endpoint (<code>GET /api/qr-status/:qris_id</code>)
                             </h4>
                             <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">Endpoint publik ringan untuk polling halaman frontend checkout tanpa membutuhkan API secret.</p>
-                            <pre style="background: #0b0f19; border: 1px solid var(--border-color); padding: 14px; border-radius: 10px; color: var(--accent-amber); font-size: 13px; overflow-x: auto;">// GET http://localhost:3000/api/qr-status/QR-9C6TS3RC
+                            <pre style="background: #0b0f19; border: 1px solid var(--border-color); padding: 14px; border-radius: 10px; color: var(--accent-cyan); font-size: 13px; overflow-x: auto;">// GET http://localhost:3000/api/qr-status/QR-9C6TS3RC
 
 {
   "success": true,
   "paid": true,
   "status": "PAID"
 }</pre>
+                        </div>
+
+                        <!-- Card 4: Webhook Payload -->
+                        <div style="background: #111827; border: 1px solid var(--border-color); border-radius: 14px; padding: 20px; margin-bottom: 20px;">
+                            <h4 style="font-size: 15px; font-weight: 700; color: #a855f7; margin-bottom: 10px;">
+                                🔔 4. Skema Webhook Callback HTTP POST (<code>webhook_url</code>)
+                            </h4>
+                            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">Dikirim otomatis ke server Pihak Ketiga saat status transaksi menjadi LUNAS (PAID).</p>
+                            <pre style="background: #0b0f19; border: 1px solid var(--border-color); padding: 14px; border-radius: 10px; color: #c084fc; font-size: 13px; overflow-x: auto;">{
+  "event": "payment.success",
+  "qris_id": "QR-9C6TS3RC",
+  "trx_id": "TRX-4UR9CRCC",
+  "client_ref_id": "INV-2026-0001",
+  "status": "PAID",
+  "amount": 10014
+}</pre>
+                        </div>
+
+                        <!-- Card 5: Manual Claim Order -->
+                        <div style="background: #111827; border: 1px solid var(--border-color); border-radius: 14px; padding: 20px; margin-bottom: 20px;">
+                            <h4 style="font-size: 15px; font-weight: 700; color: #f59e0b; margin-bottom: 10px;">
+                                🛠️ 5. Validasi Manual / Jodohkan Transaksi (<code>POST /api/orders/manual-claim</code>)
+                            </h4>
+                            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">Headers: <code>x-api-key: admin123456</code>. Memvalidasi order manual dan memicu pengiriman webhook callback.</p>
+                            <pre style="background: #0b0f19; border: 1px solid var(--border-color); padding: 14px; border-radius: 10px; color: #fbbf24; font-size: 13px; overflow-x: auto;">{
+  "qris_id": "QR-9C6TS3RC",
+  "transaction_id": "01a03c85-...",
+  "notes": "Validasi Manual Admin"
+}</pre>
+                        </div>
+
+                        <!-- Card 6: Get Orders & Transactions -->
+                        <div style="background: #111827; border: 1px solid var(--border-color); border-radius: 14px; padding: 20px; margin-bottom: 20px;">
+                            <h4 style="font-size: 15px; font-weight: 700; color: #38bdf8; margin-bottom: 10px;">
+                                📊 6. Endpoint Data Transaksi & Order
+                            </h4>
+                            <ul style="font-size: 13px; color: #d1d5db; margin-left: 20px; line-height: 1.8;">
+                                <li><code>GET /api/orders?limit=50&api_key=secret123</code> — Daftar seluruh order QRIS.</li>
+                                <li><code>GET /transactions?pageSize=50&api_key=admin123456</code> — Mutasi terdeteksi dari GoJek API.</li>
+                                <li><code>GET /api/webhooks?limit=50&api_key=secret123</code> — Log antrian webhook delivery.</li>
+                                <li><code>GET /api/logs?api_key=admin123456</code> — Real-time system log monitoring console.</li>
+                                <li><code>POST /api/orders/clear</code> (Header: <code>x-api-key: admin123456</code>) — Reset seluruh data order.</li>
+                            </ul>
                         </div>
                     </div>
                 </div>
