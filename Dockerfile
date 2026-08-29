@@ -4,7 +4,7 @@ WORKDIR /app
 
 COPY package*.json ./
 
-RUN npm install --only=production
+RUN npm config set registry https://registry.npmmirror.com/ && npm install --only=production
 
 COPY . .
 
