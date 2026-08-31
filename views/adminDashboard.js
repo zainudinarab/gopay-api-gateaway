@@ -500,14 +500,13 @@ function renderAdminDashboard(sessionExists, dbType = 'SQLite WAL') {
     <div class="admin-layout" id="section-dashboard">
         
         <!-- Sidebar Navigation Menu -->
-        <aside class="sidebar">
-            <div class="sidebar-brand">
+        <aside class="side            <div class="sidebar-brand">
                 <div class="brand-icon">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
                 </div>
                 <div>
                     <div class="brand-title">GoPay Gateway</div>
-                    <span class="brand-badge">${dbType}</span>
+                    <span class="brand-badge" style="background: rgba(56, 189, 248, 0.15); color: var(--accent-cyan); border: 1px solid rgba(56, 189, 248, 0.3); font-weight: 700;">🐘 DB: ${dbType}</span>
                 </div>
             </div>
 
@@ -537,7 +536,7 @@ function renderAdminDashboard(sessionExists, dbType = 'SQLite WAL') {
                 <div class="menu-label">Pengembang</div>
 
                 <button class="tab-btn" data-tab="logs" onclick="switchTabByName('logs', event)">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="1" x2="20" y2="19"></line></svg>
                     💻 Live System Logs
                 </button>
                 
@@ -564,9 +563,14 @@ function renderAdminDashboard(sessionExists, dbType = 'SQLite WAL') {
                 </div>
                 
                 <div class="header-actions">
+                    <div class="system-pill" style="border-color: rgba(56, 189, 248, 0.4); background: rgba(56, 189, 248, 0.1); color: var(--accent-cyan); font-weight: 600;">
+                        <span class="status-dot" style="background: var(--accent-cyan); box-shadow: 0 0 8px var(--accent-cyan);"></span>
+                        <span>🛢️ Database Engine: <strong>${dbType}</strong></span>
+                    </div>
                     <div class="system-pill">
                         <span class="status-dot"></span>
                         <span>Reconciler & Webhook Active</span>
+                    </div>
                     </div>
                     <button class="btn-primary btn-sm" onclick="refreshCurrentTab()" style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: var(--text-main);">
                         🔄 Sync Data
