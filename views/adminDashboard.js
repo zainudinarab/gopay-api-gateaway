@@ -2,7 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 
-function renderAdminDashboard(sessionExists) {
+function renderAdminDashboard(sessionExists, dbType = 'SQLite WAL') {
     return `<!DOCTYPE html>
 <html lang="id">
 <head>
@@ -507,7 +507,7 @@ function renderAdminDashboard(sessionExists) {
                 </div>
                 <div>
                     <div class="brand-title">GoPay Gateway</div>
-                    <span class="brand-badge">SQLite WAL</span>
+                    <span class="brand-badge">${dbType}</span>
                 </div>
             </div>
 

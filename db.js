@@ -769,5 +769,8 @@ module.exports = {
         } else {
             sqliteDb.prepare(`DELETE FROM merchant_sessions WHERE session_key = ?`).run(key);
         }
-    }
+    },
+
+    isPostgres,
+    dbType: isPostgres ? 'PostgreSQL' : 'SQLite WAL'
 };
