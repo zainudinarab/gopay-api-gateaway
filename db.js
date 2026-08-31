@@ -25,63 +25,93 @@ if (isPostgres) {
 
     pgPool = new Pool(pgConfig);
 
-    // Initialize PostgreSQL Tables
-    const initPgSchema = async () => {
-        try {
-            const client = await pgPool.connect();
-            await client.query(`
-                CREATE TABLE IF NOT EXISTS qris_orders (
-                    qris_id VARCHAR(100) PRIMARY KEY,
-                    trx_id VARCHAR(100) UNIQUE,
-                    client_ref_id VARCHAR(255),
-                    webhook_url TEXT,
-                    webhook_status VARCHAR(50) DEFAULT 'PENDING',
-                    amount BIGINT NOT NULL,
-                    base_amount BIGINT,
-                    unique_code INT DEFAULT 0,
-                    qris_code TEXT NOT NULL,
-                    status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
-                    app_id VARCHAR(100) DEFAULT 'default',
-                    transaction_data TEXT,
-                    created_at BIGINT NOT NULL,
-                    expires_at BIGINT NOT NULL
-                );
+    // Initialize PostgreSQL Tables with auto-create database and retry logic
+    const initPgSchema = async (retries = 10, delay = 2000) => {
+        const targetDbName = process.env.DB_NAME || 'gopaygateway';
+        for (let i = 1; i <= retries; i++) {
+            try {
+                let client;
+                try {
+                    client = await pgPool.connect();
+                } catch (connErr) {
+                    // Check if error is database does not exist (PostgreSQL error code 3D000)
+                    if (connErr.code === '3D000' || (connErr.message && connErr.message.includes('does not exist'))) {
+                        console.log(`[DATABASE] Database "${targetDbName}" does not exist. Creating database...`);
+                        const adminPool = new Pool({
+                            ...pgConfig,
+                            database: 'postgres'
+                        });
+                        const adminClient = await adminPool.connect();
+                        await adminClient.query(`CREATE DATABASE "${targetDbName}"`);
+                        adminClient.release();
+                        await adminPool.end();
+                        console.log(`[DATABASE] Database "${targetDbName}" created successfully!`);
+                        client = await pgPool.connect();
+                    } else {
+                        throw connErr;
+                    }
+                }
 
-                CREATE TABLE IF NOT EXISTS claimed_transactions (
-                    transaction_id VARCHAR(255) PRIMARY KEY,
-                    order_id VARCHAR(255),
-                    qris_id VARCHAR(100),
-                    amount BIGINT NOT NULL,
-                    payer_issuer VARCHAR(100),
-                    payment_type VARCHAR(100),
-                    transaction_time VARCHAR(100),
-                    claimed_at BIGINT NOT NULL
-                );
+                await client.query(`
+                    CREATE TABLE IF NOT EXISTS qris_orders (
+                        qris_id VARCHAR(100) PRIMARY KEY,
+                        trx_id VARCHAR(100) UNIQUE,
+                        client_ref_id VARCHAR(255),
+                        webhook_url TEXT,
+                        webhook_status VARCHAR(50) DEFAULT 'PENDING',
+                        amount BIGINT NOT NULL,
+                        base_amount BIGINT,
+                        unique_code INT DEFAULT 0,
+                        qris_code TEXT NOT NULL,
+                        status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
+                        app_id VARCHAR(100) DEFAULT 'default',
+                        transaction_data TEXT,
+                        created_at BIGINT NOT NULL,
+                        expires_at BIGINT NOT NULL
+                    );
 
-                CREATE TABLE IF NOT EXISTS webhook_queue (
-                    id SERIAL PRIMARY KEY,
-                    qris_id VARCHAR(100) NOT NULL,
-                    client_ref_id VARCHAR(255),
-                    webhook_url TEXT NOT NULL,
-                    payload TEXT NOT NULL,
-                    attempts INT DEFAULT 0,
-                    max_attempts INT DEFAULT 3,
-                    status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
-                    last_error TEXT,
-                    created_at BIGINT NOT NULL,
-                    next_attempt_at BIGINT NOT NULL
-                );
+                    CREATE TABLE IF NOT EXISTS claimed_transactions (
+                        transaction_id VARCHAR(255) PRIMARY KEY,
+                        order_id VARCHAR(255),
+                        qris_id VARCHAR(100),
+                        amount BIGINT NOT NULL,
+                        payer_issuer VARCHAR(100),
+                        payment_type VARCHAR(100),
+                        transaction_time VARCHAR(100),
+                        claimed_at BIGINT NOT NULL
+                    );
 
-                CREATE TABLE IF NOT EXISTS merchant_sessions (
-                    session_key VARCHAR(100) PRIMARY KEY,
-                    session_data TEXT NOT NULL,
-                    updated_at BIGINT NOT NULL
-                );
-            `);
-            client.release();
-            console.log('[DATABASE] Connected & Schema Initialized on PostgreSQL!');
-        } catch (err) {
-            console.error('[DATABASE ERROR] Failed to initialize PostgreSQL:', err.message);
+                    CREATE TABLE IF NOT EXISTS webhook_queue (
+                        id SERIAL PRIMARY KEY,
+                        qris_id VARCHAR(100) NOT NULL,
+                        client_ref_id VARCHAR(255),
+                        webhook_url TEXT NOT NULL,
+                        payload TEXT NOT NULL,
+                        attempts INT DEFAULT 0,
+                        max_attempts INT DEFAULT 3,
+                        status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
+                        last_error TEXT,
+                        created_at BIGINT NOT NULL,
+                        next_attempt_at BIGINT NOT NULL
+                    );
+
+                    CREATE TABLE IF NOT EXISTS merchant_sessions (
+                        session_key VARCHAR(100) PRIMARY KEY,
+                        session_data TEXT NOT NULL,
+                        updated_at BIGINT NOT NULL
+                    );
+                `);
+                client.release();
+                console.log(`[DATABASE] Connected & Schema Initialized on PostgreSQL (${targetDbName})!`);
+                return;
+            } catch (err) {
+                console.error(`[DATABASE ERROR] Attempt ${i}/${retries} failed to initialize PostgreSQL:`, err.message);
+                if (i < retries) {
+                    await new Promise(res => setTimeout(res, delay));
+                } else {
+                    console.error('[DATABASE CRITICAL] Max retries reached. PostgreSQL initialization failed.');
+                }
+            }
         }
     };
     initPgSchema();

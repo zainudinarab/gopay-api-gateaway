@@ -1,6 +1,19 @@
 version: '3.8'
 
 services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres_db
+    restart: always
+    environment:
+      POSTGRES_USER: zainudinarab
+      POSTGRES_PASSWORD: arabpay
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
   gopay-gateway:
     build: .
     container_name: gopay-gateway
@@ -11,6 +24,17 @@ services:
       - .env
     environment:
       - PORT=3000
+      - DB_TYPE=postgres
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=zainudinarab
+      - DB_PASSWORD: arabpay
+      - DB_NAME: gopaygateway
     volumes:
-      - ./gateway.db:/app/gateway.db
       - ./.GOPAY_SESI_JANGAN_DIHAPUS.json:/app/.GOPAY_SESI_JANGAN_DIHAPUS.json
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
+
