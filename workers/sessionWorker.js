@@ -8,10 +8,11 @@ const { logActivity } = require('../services/loggerService');
 async function syncSessionWithDatabase() {
     try {
         const sessionFile = path.join(__dirname, '..', '.GOPAY_SESI_JANGAN_DIHAPUS.json');
+        const isFile = fs.existsSync(sessionFile) && fs.statSync(sessionFile).isFile();
         
-        if (fs.existsSync(sessionFile)) {
+        if (isFile) {
             const fileData = fs.readFileSync(sessionFile, 'utf8').trim();
-            if (fileData) {
+            if (fileData && fileData.startsWith('{')) {
                 const parsed = JSON.parse(fileData);
                 await db.saveMerchantSession(parsed);
             }

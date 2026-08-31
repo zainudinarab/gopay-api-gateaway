@@ -717,7 +717,17 @@ module.exports = {
     },
 
     async saveMerchantSession(sessionData, key = 'gobiz_primary') {
-        const str = typeof sessionData === 'object' ? JSON.stringify(sessionData, null, 2) : String(sessionData);
+        if (!sessionData) return;
+        let str;
+        if (typeof sessionData === 'string') {
+            str = sessionData;
+        } else {
+            try {
+                str = JSON.stringify(sessionData);
+            } catch (e) {
+                str = String(sessionData);
+            }
+        }
         if (isPostgres) {
             try {
                 await pgPool.query(`
