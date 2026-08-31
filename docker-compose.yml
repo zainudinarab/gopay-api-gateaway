@@ -6,11 +6,11 @@ services:
     container_name: postgres_db
     restart: always
     environment:
-      POSTGRES_USER: zainudinarab
-      POSTGRES_PASSWORD: arabpay
-      POSTGRES_DB: postgres
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
@@ -19,17 +19,9 @@ services:
     container_name: gopay-gateway
     restart: always
     ports:
-      - "3000:3000"
+      - "${PORT:-3000}:3000"
     env_file:
       - .env
-    environment:
-      - PORT=3000
-      - DB_TYPE=postgres
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_USER=zainudinarab
-      - DB_PASSWORD=arabpay
-      - DB_NAME=gopaygateway
     depends_on:
       - postgres
 
