@@ -12,7 +12,17 @@ const { renderAdminDashboard } = require('../views/adminDashboard');
 
 // Halaman Admin Portal Dashboard (/login)
 router.get('/login', async (req, res) => {
-    const sessionFileExists = fs.existsSync(path.join(__dirname, '..', '.GOPAY_SESI_JANGAN_DIHAPUS.json'));
+    let sessionFileExists = false;
+    const sessionPath = path.join(__dirname, '..', '.GOPAY_SESI_JANGAN_DIHAPUS.json');
+    try {
+        if (fs.existsSync(sessionPath) && fs.statSync(sessionPath).isFile()) {
+            const content = fs.readFileSync(sessionPath, 'utf8');
+            if (content && content.trim().startsWith('{')) {
+                sessionFileExists = true;
+            }
+        }
+    } catch (e) {}
+
     const dbSessionExists = Boolean(await db.getMerchantSession());
     const sessionExists = sessionFileExists || dbSessionExists;
     const html = renderAdminDashboard(sessionExists, db.dbType);

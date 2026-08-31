@@ -28,10 +28,8 @@ services:
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_USER=zainudinarab
-      - DB_PASSWORD: arabpay
-      - DB_NAME: gopaygateway
-    volumes:
-      - ./.GOPAY_SESI_JANGAN_DIHAPUS.json:/app/.GOPAY_SESI_JANGAN_DIHAPUS.json
+      - DB_PASSWORD=arabpay
+      - DB_NAME=gopaygateway
     depends_on:
       - postgres
 
