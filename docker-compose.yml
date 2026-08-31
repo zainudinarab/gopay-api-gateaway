@@ -1,19 +1,6 @@
 version: '3.8'
 
 services:
-  postgres:
-    image: postgres:15-alpine
-    container_name: postgres_db
-    restart: always
-    environment:
-      POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB:-postgres}
-    ports:
-      - "${DB_PORT:-5432}:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
   gopay-gateway:
     build: .
     container_name: gopay-gateway
@@ -22,9 +9,5 @@ services:
       - "${PORT:-3000}:3000"
     env_file:
       - .env
-    depends_on:
-      - postgres
-
-volumes:
-  postgres_data:
-
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
