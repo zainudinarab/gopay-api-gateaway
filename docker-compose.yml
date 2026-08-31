@@ -9,5 +9,9 @@ services:
       - "${PORT:-3000}:3000"
     env_file:
       - .env
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    networks:
+      - app_shared_net
+
+networks:
+  app_shared_net:
+    external: true
