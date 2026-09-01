@@ -500,7 +500,8 @@ function renderAdminDashboard(sessionExists, dbType = 'SQLite WAL') {
     <div class="admin-layout" id="section-dashboard">
         
         <!-- Sidebar Navigation Menu -->
-        <aside class="side            <div class="sidebar-brand">
+        <aside class="sidebar">
+            <div class="sidebar-brand">
                 <div class="brand-icon">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
                 </div>
