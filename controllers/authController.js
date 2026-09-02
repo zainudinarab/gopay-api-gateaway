@@ -38,12 +38,16 @@ const requestOTP = (req, res) => {
     let outputBuffer = '';
 
     proc.stdout.on('data', (chunk) => {
-        const str = chunk.toString();
-        outputBuffer += str;
-        console.log('[LOGIN CLI STDOUT]:', str.trim());
+        const str = chunk.toString().trim();
+        outputBuffer += str + '\n';
+        console.log('[LOGIN CLI STDOUT]:', str);
+        if (str) {
+            logActivity('INFO', `[LOGIN OTP PROCESS] ${str}`);
+        }
 
         if (!responseSent && (str.includes('OTP') || str.includes('dikirim') || str.includes('Masukkan') || str.includes('otp'))) {
             responseSent = true;
+            logActivity('SUCCESS', `[WEB LOGIN] Kode OTP berhasil dikirimkan via SMS/WA ke ${phone}`);
             return res.json({
                 success: true,
                 message: `Kode OTP berhasil dikirim ke ${phone}! Silakan periksa SMS/WA di HP Anda.`
@@ -52,20 +56,27 @@ const requestOTP = (req, res) => {
 
         if (!responseSent && (str.toLowerCase().includes('gagal') || str.toLowerCase().includes('error'))) {
             responseSent = true;
-            return res.status(500).json({ success: false, message: str.trim() });
+            logActivity('ERROR', `[WEB LOGIN] Gagal mengirimkan OTP: ${str}`);
+            return res.status(500).json({ success: false, message: str });
         }
     });
 
     proc.stderr.on('data', (chunk) => {
-        console.log('[LOGIN CLI ERROR]:', chunk.toString());
+        const errStr = chunk.toString().trim();
+        console.log('[LOGIN CLI ERROR]:', errStr);
+        if (errStr) {
+            logActivity('ERROR', `[LOGIN OTP ERROR] ${errStr}`);
+        }
     });
 
     proc.on('exit', (code) => {
         if (!responseSent) {
             responseSent = true;
             if (outputBuffer.includes('berhasil') || outputBuffer.includes('OTP')) {
+                logActivity('SUCCESS', `[WEB LOGIN] Kode OTP berhasil dikirim ke ${phone}!`);
                 res.json({ success: true, message: `Kode OTP berhasil dikirim ke ${phone}!` });
             } else {
+                logActivity('ERROR', `[WEB LOGIN] Gagal mengirim OTP (Exit Code ${code})`);
                 res.status(500).json({ success: false, message: 'Gagal mengirim OTP. Pastikan nomor HP terdaftar di GoBiz.' });
             }
         }
@@ -74,6 +85,7 @@ const requestOTP = (req, res) => {
     setTimeout(() => {
         if (!responseSent) {
             responseSent = true;
+            logActivity('INFO', `[WEB LOGIN] Permintaan OTP dikirim ke HP ${phone}`);
             res.json({ success: true, message: `Permintaan OTP dikirim. Silakan periksa SMS/WA di HP ${phone}.` });
         }
     }, 15000);
@@ -94,18 +106,23 @@ const verifyOTP = (req, res) => {
     const proc = activeLoginProcess;
 
     proc.stdout.on('data', (chunk) => {
-        const str = chunk.toString();
-        console.log('[LOGIN CLI VERIFY]:', str.trim());
+        const str = chunk.toString().trim();
+        console.log('[LOGIN CLI VERIFY]:', str);
+        if (str) {
+            logActivity('INFO', `[LOGIN VERIFY PROCESS] ${str}`);
+        }
 
         if (!responseSent && (str.includes('Berhasil') || str.includes('Sesi') || str.includes('disimpan'))) {
             responseSent = true;
             mutationCache.data = null;
             activeLoginProcess = null;
+            logActivity('SUCCESS', `[WEB LOGIN] Login GoBiz BERHASIL! Sesi Merchant GoPay telah aktif & tersimpan di PostgreSQL.`);
             return res.json({ success: true, message: 'Login GoBiz Berhasil! Sesi Merchant GoPay telah aktif.' });
         }
 
         if (!responseSent && (str.toLowerCase().includes('gagal') || str.toLowerCase().includes('salah') || str.toLowerCase().includes('invalid'))) {
             responseSent = true;
+            logActivity('WARNING', `[WEB LOGIN] Verifikasi OTP Gagal: Kode OTP Salah atau Expired.`);
             return res.status(400).json({ success: false, message: 'Kode OTP Salah atau Kedaluwarsa. Silakan coba lagi.' });
         }
     });
@@ -117,6 +134,7 @@ const verifyOTP = (req, res) => {
         if (!responseSent) {
             responseSent = true;
             mutationCache.data = null;
+            logActivity('SUCCESS', `[WEB LOGIN] Verifikasi OTP selesai. Sesi GoBiz aktif.`);
             res.json({ success: true, message: 'Login GoBiz Berhasil! Sesi Merchant GoPay telah aktif.' });
         }
     });
@@ -126,6 +144,7 @@ const verifyOTP = (req, res) => {
             responseSent = true;
             mutationCache.data = null;
             activeLoginProcess = null;
+            logActivity('INFO', `[WEB LOGIN] Verifikasi OTP selesai.`);
             res.json({ success: true, message: 'Proses verifikasi selesai. Sesi GoBiz telah diperbarui.' });
         }
     }, 10000);
