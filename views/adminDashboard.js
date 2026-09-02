@@ -2,7 +2,17 @@
 const fs = require('fs');
 const path = require('path');
 
-function renderAdminDashboard(sessionExists, dbType = 'SQLite WAL') {
+function renderAdminDashboard(sessionDataOrExists, dbType = 'SQLite WAL', sessionObj = null) {
+    let sessionExists = false;
+    let merchantSession = null;
+    
+    if (typeof sessionDataOrExists === 'object' && sessionDataOrExists !== null) {
+        sessionExists = true;
+        merchantSession = sessionDataOrExists;
+    } else {
+        sessionExists = Boolean(sessionDataOrExists);
+        merchantSession = sessionObj;
+    }
     return `<!DOCTYPE html>
 <html lang="id">
 <head>
@@ -572,7 +582,6 @@ function renderAdminDashboard(sessionExists, dbType = 'SQLite WAL') {
                         <span class="status-dot"></span>
                         <span>Reconciler & Webhook Active</span>
                     </div>
-                    </div>
                     <button class="btn-primary btn-sm" onclick="refreshCurrentTab()" style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: var(--text-main);">
                         🔄 Sync Data
                     </button>
@@ -625,12 +634,52 @@ function renderAdminDashboard(sessionExists, dbType = 'SQLite WAL') {
                         </div>
 
                         ${sessionExists ? `
-                        <div id="logged-in-box" style="padding: 12px 0;">
-                            <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 24px; line-height: 1.6;">
-                                Sesi login GoBiz Merchant Anda saat ini aktif dan tersimpan secara permanen di server. Background Reconciler Worker siap mencocokkan pembayaran QRIS otomatis 24/7.
-                            </p>
-                            <button class="btn-primary btn-danger" onclick="logoutSession()" style="background: rgba(239,68,68,0.2); border: 1px solid rgba(239,68,68,0.4);">
-                                🗑️ Hapus / Putuskan Sesi Login GoPay Merchant
+                        <div id="logged-in-box" style="padding: 16px 0;">
+                            <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 12px; padding: 20px; margin-bottom: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+                                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+                                    <div style="display: flex; align-items: center; gap: 12px;">
+                                        <div style="width: 44px; height: 44px; border-radius: 10px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); display: flex; align-items: center; justify-content: center; font-size: 22px;">
+                                            🏪
+                                        </div>
+                                        <div>
+                                            <h4 style="margin: 0; font-size: 16px; font-weight: 700; color: #fff;">${merchantSession && merchantSession.outlet_name ? merchantSession.outlet_name : 'Merchant GoPay Partner'}</h4>
+                                            <span style="font-size: 12px; color: var(--accent-cyan); font-weight: 600;">GoBiz Partner Outlet</span>
+                                        </div>
+                                    </div>
+                                    <span style="background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.3); color: var(--accent-green); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
+                                        <span style="width: 7px; height: 7px; background: var(--accent-green); border-radius: 50%; display: inline-block; box-shadow: 0 0 6px var(--accent-green);"></span> Sesi Aktif 24/7
+                                    </span>
+                                </div>
+
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 16px;">
+                                    <div style="background: rgba(255,255,255,0.03); padding: 12px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
+                                        <div style="font-size: 11.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">🆔 GoPay Merchant ID</div>
+                                        <div style="font-size: 14.5px; font-weight: 700; color: var(--accent-cyan); font-family: 'JetBrains Mono', monospace;">${merchantSession && merchantSession.merchant_id ? merchantSession.merchant_id : '-'}</div>
+                                    </div>
+                                    
+                                    <div style="background: rgba(255,255,255,0.03); padding: 12px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
+                                        <div style="font-size: 11.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">📱 Nomor HP Terdaftar</div>
+                                        <div style="font-size: 14.5px; font-weight: 700; color: #fff;">${merchantSession && merchantSession.phone_number ? merchantSession.phone_number : '-'}</div>
+                                    </div>
+
+                                    <div style="background: rgba(255,255,255,0.03); padding: 12px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
+                                        <div style="font-size: 11.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">⏳ Sesi Berakhir (Expires)</div>
+                                        <div style="font-size: 13.5px; font-weight: 600; color: #f59e0b;">${merchantSession && merchantSession.expires_at ? new Date(merchantSession.expires_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) + ' WIB' : 'Auto-Refreshed'}</div>
+                                    </div>
+
+                                    <div style="background: rgba(255,255,255,0.03); padding: 12px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
+                                        <div style="font-size: 11.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">🔑 Token Authenticated</div>
+                                        <div style="font-size: 13.5px; font-weight: 600; color: var(--accent-green);">🟢 JWT Token Valid</div>
+                                    </div>
+                                </div>
+
+                                <p style="font-size: 12.5px; color: var(--text-muted); margin: 0; line-height: 1.5;">
+                                    💡 <strong>Fitur Auto-Keep-Alive</strong>: Worker gateway secara otomatis memperbarui token GoBiz setiap 6 jam sehingga sesi login toko Anda terus aktif 24/7 tanpa perlu input OTP ulang.
+                                </p>
+                            </div>
+
+                            <button class="btn-primary btn-danger" onclick="logoutSession()" style="background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #f87171; font-weight: 600;">
+                                🗑️ Putuskan / Hapus Sesi Login GoPay Merchant
                             </button>
                         </div>
                         ` : `
@@ -656,9 +705,13 @@ function renderAdminDashboard(sessionExists, dbType = 'SQLite WAL') {
                                 <label for="inp-otp">Kode OTP GoBiz (4 Digit)</label>
                                 <input type="text" id="inp-otp" placeholder="____" maxlength="6" style="letter-spacing: 6px; text-align: center; font-size: 24px; font-weight: 800;">
                             </div>
-                            <button class="btn-primary" id="btn-verify" onclick="verifyOTP()">
+                            <button class="btn-primary" id="btn-verify" onclick="verifyOTP()" style="margin-bottom: 12px;">
                                 <span class="spinner" id="spin-2"></span>
                                 <span id="lbl-2">✅ Verifikasi & Aktifkan Sesi</span>
+                            </button>
+
+                            <button class="btn-primary" id="btn-resend-otp" onclick="resendOTP()" disabled style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: var(--text-muted); width: 100%; font-size: 13px; cursor: not-allowed; margin-top: 4px;">
+                                🔄 Kirim Ulang OTP (<span id="resend-timer">02:00</span>)
                             </button>
                         </div>
                         `}
@@ -1391,6 +1444,7 @@ User-Agent: GoPay-Gateway-Webhook-Worker/1.0</pre>
                     showAlert('success', data.message);
                     document.getElementById('step-1').style.display = 'none';
                     document.getElementById('step-2').style.display = 'block';
+                    startResendCountdown();
                 } else {
                     showAlert('error', data.message || 'Gagal mengirimkan OTP');
                 }
@@ -1401,6 +1455,51 @@ User-Agent: GoPay-Gateway-Webhook-Worker/1.0</pre>
                 spin.style.display = 'none';
                 lbl.innerText = '📱 Kirim Kode OTP (SMS/WA)';
             }
+        }
+
+        let resendInterval = null;
+        let resendSeconds = 120;
+
+        function startResendCountdown() {
+            clearInterval(resendInterval);
+            resendSeconds = 120;
+            const btn = document.getElementById('btn-resend-otp');
+            if (!btn) return;
+            
+            btn.disabled = true;
+            btn.style.cursor = 'not-allowed';
+            btn.style.color = 'var(--text-muted)';
+            btn.style.background = 'rgba(255,255,255,0.06)';
+            btn.style.borderColor = 'var(--border-color)';
+
+            const updateText = () => {
+                const mins = String(Math.floor(resendSeconds / 60)).padStart(2, '0');
+                const secs = String(resendSeconds % 60).padStart(2, '0');
+                btn.innerHTML = '🔄 Kirim Ulang OTP (' + mins + ':' + secs + ')';
+            };
+
+            updateText();
+
+            resendInterval = setInterval(() => {
+                resendSeconds--;
+                if (resendSeconds <= 0) {
+                    clearInterval(resendInterval);
+                    btn.disabled = false;
+                    btn.style.cursor = 'pointer';
+                    btn.style.color = 'var(--accent-cyan)';
+                    btn.style.background = 'rgba(56, 189, 248, 0.15)';
+                    btn.style.borderColor = 'rgba(56, 189, 248, 0.35)';
+                    btn.innerHTML = '🔄 Kirim Ulang OTP';
+                } else {
+                    updateText();
+                }
+            }, 1000);
+        }
+
+        async function resendOTP() {
+            const btn = document.getElementById('btn-resend-otp');
+            if (btn && btn.disabled) return;
+            await requestOTP();
         }
 
         async function verifyOTP() {
