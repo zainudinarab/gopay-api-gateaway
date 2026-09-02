@@ -125,7 +125,7 @@ async function verifyPayment(targetAmount, orderCreationTime = null, customMerch
         const txTimestamp = new Date(tx.transaction_time || tx.settlement_time || tx.created_at || 0).getTime();
 
         if (txAmount === targetAmount && txTimestamp >= filterStartTimeMs) {
-            const existingClaim = db.getClaimedTransaction(txId);
+            const existingClaim = await db.getClaimedTransaction(txId);
 
             if (!existingClaim) {
                 const GRACE_PERIOD_MS = 2 * 60 * 60 * 1000;
@@ -150,17 +150,17 @@ async function verifyPayment(targetAmount, orderCreationTime = null, customMerch
                 let targetOwnerQrisId = null;
 
                 if (qrisId) {
-                    const callerOrder = db.getOrder(qrisId);
+                    const callerOrder = await db.getOrder(qrisId);
                     if (callerOrder && callerOrder.status === 'PENDING' && callerOrder.amount === txAmount) {
                         if (isSameDateOrActiveWindow(callerOrder)) {
-                            targetOwnerQrisId = qrisId;
+                            targetOwnerQrisId = callerOrder.qrisId || qrisId;
                         }
                     }
                 }
 
                 if (!targetOwnerQrisId) {
-                    const pendingOrders = db.getPendingOrdersForAmount(targetAmount)
-                        .filter(o => isSameDateOrActiveWindow(o));
+                    const rawPending = await db.getPendingOrdersForAmount(targetAmount);
+                    const pendingOrders = (rawPending || []).filter(o => isSameDateOrActiveWindow(o));
                     if (pendingOrders.length > 0) {
                         targetOwnerQrisId = pendingOrders[0].qrisId;
                     }
@@ -179,7 +179,7 @@ async function verifyPayment(targetAmount, orderCreationTime = null, customMerch
                     transaction_time: tx.transaction_time || tx.settlement_time
                 };
 
-                db.claimTransaction(txId, {
+                await db.claimTransaction(txId, {
                     order_id: tx.order_id,
                     qrisId: targetOwnerQrisId,
                     amount: txAmount,
@@ -189,11 +189,11 @@ async function verifyPayment(targetAmount, orderCreationTime = null, customMerch
                 });
 
                 if (targetOwnerQrisId) {
-                    db.updateOrderStatus(targetOwnerQrisId, 'PAID', matched);
+                    await db.updateOrderStatus(targetOwnerQrisId, 'PAID', matched);
 
-                    const ownerOrder = db.getOrder(targetOwnerQrisId);
+                    const ownerOrder = await db.getOrder(targetOwnerQrisId);
                     if (ownerOrder && ownerOrder.webhookUrl && (ownerOrder.webhookStatus === 'PENDING' || ownerOrder.webhookStatus === 'NONE')) {
-                        db.enqueueWebhook({
+                        await db.enqueueWebhook({
                             qrisId: targetOwnerQrisId,
                             clientRefId: ownerOrder.clientRefId,
                             webhookUrl: ownerOrder.webhookUrl,
@@ -209,7 +209,7 @@ async function verifyPayment(targetAmount, orderCreationTime = null, customMerch
                                 transaction: matched
                             }
                         });
-                        db.updateOrderWebhookStatus(targetOwnerQrisId, 'QUEUED');
+                        await db.updateOrderWebhookStatus(targetOwnerQrisId, 'QUEUED');
                         logActivity('INFO', `Webhook notifikasi dimasukkan ke antrian queue untuk QRIS ${targetOwnerQrisId}`);
                     }
                 }
