@@ -424,32 +424,40 @@ module.exports = {
     },
 
     async updateOrderStatus(qrisId, status, transactionData = null) {
+        if (!qrisId) return;
         if (isPostgres) {
             try {
-                await pgPool.query(`UPDATE qris_orders SET status = $1, transaction_data = $2 WHERE qris_id = $3`, [
+                await pgPool.query(`UPDATE qris_orders SET status = $1, transaction_data = $2 WHERE qris_id = $3 OR trx_id = $3`, [
                     status, transactionData ? JSON.stringify(transactionData) : null, qrisId
                 ]);
             } catch (e) {
                 console.error('[PG UPDATE STATUS ERROR]:', e.message);
             }
         } else {
-            stmtUpdateOrderStatus.run({
-                qrisId,
-                status,
-                transactionData: transactionData ? JSON.stringify(transactionData) : null
-            });
+            try {
+                sqliteDb.prepare(`UPDATE qris_orders SET status = ?, transaction_data = ? WHERE qris_id = ? OR trx_id = ?`).run(
+                    status, transactionData ? JSON.stringify(transactionData) : null, qrisId, qrisId
+                );
+            } catch (e) {
+                console.error('[SQLITE UPDATE STATUS ERROR]:', e.message);
+            }
         }
     },
 
     async updateOrderWebhookStatus(qrisId, webhookStatus) {
+        if (!qrisId) return;
         if (isPostgres) {
             try {
-                await pgPool.query(`UPDATE qris_orders SET webhook_status = $1 WHERE qris_id = $2`, [webhookStatus, qrisId]);
+                await pgPool.query(`UPDATE qris_orders SET webhook_status = $1 WHERE qris_id = $2 OR trx_id = $2`, [webhookStatus, qrisId]);
             } catch (e) {
                 console.error('[PG UPDATE WEBHOOK STATUS ERROR]:', e.message);
             }
         } else {
-            stmtUpdateOrderWebhookStatus.run(webhookStatus, qrisId);
+            try {
+                sqliteDb.prepare(`UPDATE qris_orders SET webhook_status = ? WHERE qris_id = ? OR trx_id = ?`).run(webhookStatus, qrisId, qrisId);
+            } catch (e) {
+                console.error('[SQLITE UPDATE WEBHOOK STATUS ERROR]:', e.message);
+            }
         }
     },
 

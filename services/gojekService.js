@@ -221,18 +221,58 @@ async function verifyPayment(targetAmount, orderCreationTime = null, customMerch
                 } else {
                     continue;
                 }
-            } else if (qrisId && existingClaim.qrisId === qrisId) {
-                return {
-                    transaction_id: txId,
-                    order_id: existingClaim.orderId,
-                    amount: existingClaim.amount,
-                    payer_issuer: existingClaim.payerIssuer,
-                    payment_type: existingClaim.paymentType,
-                    transaction_time: existingClaim.transactionTime
-                };
-            } else {
-                logActivity('INFO', `TRX ${txId} sudah diklaim oleh QRIS ${existingClaim.qrisId || 'lain'}, skip untuk QRIS ${qrisId}`);
-                continue;
+            } else if (existingClaim) {
+                const targetOrder = await db.getOrder(qrisId);
+                const claimedOrder = existingClaim.qrisId ? await db.getOrder(existingClaim.qrisId) : null;
+                
+                const isSameOrder = targetOrder && claimedOrder && (targetOrder.qrisId === claimedOrder.qrisId || targetOrder.trxId === claimedOrder.trxId);
+                const isDirectMatch = targetOrder && (
+                    existingClaim.qrisId === targetOrder.qrisId || 
+                    existingClaim.qrisId === targetOrder.trxId || 
+                    existingClaim.qris_id === targetOrder.qrisId || 
+                    existingClaim.qris_id === targetOrder.trxId ||
+                    existingClaim.txId === targetOrder.qrisId || 
+                    existingClaim.txId === targetOrder.trxId
+                );
+
+                if (isSameOrder || isDirectMatch || (!qrisId && existingClaim.qrisId)) {
+                    const matched = {
+                        transaction_id: txId,
+                        order_id: existingClaim.orderId || (targetOrder ? targetOrder.trxId : null),
+                        amount: existingClaim.amount || (targetOrder ? targetOrder.amount : 0),
+                        payer_issuer: existingClaim.payerIssuer || 'GoPay / Bank',
+                        payment_type: existingClaim.paymentType || 'QRIS',
+                        transaction_time: existingClaim.transactionTime || new Date().toISOString()
+                    };
+
+                    const realQrisId = targetOrder ? targetOrder.qrisId : existingClaim.qrisId;
+                    await db.updateOrderStatus(realQrisId, 'PAID', matched);
+                    
+                    if (targetOrder && targetOrder.webhookUrl && (targetOrder.webhookStatus === 'PENDING' || targetOrder.webhookStatus === 'NONE')) {
+                        await db.enqueueWebhook({
+                            qrisId: targetOrder.qrisId,
+                            clientRefId: targetOrder.clientRefId,
+                            webhookUrl: targetOrder.webhookUrl,
+                            payload: {
+                                event: 'payment.success',
+                                qris_id: targetOrder.qrisId,
+                                trx_id: targetOrder.trxId,
+                                client_ref_id: targetOrder.clientRefId,
+                                status: 'PAID',
+                                amount: targetOrder.amount,
+                                base_amount: targetOrder.baseAmount,
+                                unique_code: targetOrder.uniqueCode,
+                                transaction: matched
+                            }
+                        });
+                        await db.updateOrderWebhookStatus(targetOrder.qrisId, 'QUEUED');
+                    }
+
+                    return matched;
+                } else {
+                    logActivity('INFO', `TRX ${txId} sudah diklaim oleh QRIS ${existingClaim.qrisId || 'lain'}, skip untuk QRIS ${qrisId}`);
+                    continue;
+                }
             }
         }
     }
