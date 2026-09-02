@@ -23,9 +23,9 @@ const createQris = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Nominal minimal Rp 1' });
         }
 
-        const staticQR = process.env.GOPAY_STATIC_QRIS;
+        const staticQR = await db.getStaticQris();
         if (!staticQR) {
-            return res.status(500).json({ success: false, message: 'GOPAY_STATIC_QRIS belum dikonfigurasi di file .env' });
+            return res.status(500).json({ success: false, message: 'GOPAY_STATIC_QRIS belum dikonfigurasi di Database atau .env' });
         }
 
         const QRIS_EXPIRY_MS = parseFloat(expiresHoursInput) * 60 * 60 * 1000;
@@ -128,7 +128,8 @@ const renderQrCheckout = async (req, res) => {
         return res.status(404).send('<h2>404 - QRIS Tidak Ditemukan atau Sudah Kedaluwarsa</h2>');
     }
 
-    const qrisString = qris.qrisString || qris.data || qris.qrisCode || process.env.GOPAY_STATIC_QRIS || '';
+    const staticFallbackQR = await db.getStaticQris();
+    const qrisString = qris.qrisString || qris.data || qris.qrisCode || staticFallbackQR || '';
 
     if (rawId.endsWith('.png')) {
         const qrImageBuffer = await QRCode.toBuffer(qrisString);

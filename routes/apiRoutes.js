@@ -37,4 +37,22 @@ router.post('/check-payment', apiKeyAuth, transactionController.checkPayment);
 router.get('/webhooks', apiKeyAuth, webhookController.getAllWebhooks);
 router.get('/logs', apiKeyAuth, (req, res) => res.json({ success: true, logs: activityLogs }));
 
+// QRIS Settings Endpoints (Database Storage)
+router.get('/settings/qris', async (req, res) => {
+    const db = require('../db');
+    const qrisString = await db.getStaticQris();
+    res.json({ success: true, qris_string: qrisString });
+});
+
+router.post('/settings/qris', adminPassAuth, async (req, res) => {
+    const db = require('../db');
+    const qrisString = (req.body?.qris_string || req.body?.qris || '').trim();
+    if (!qrisString) {
+        return res.status(400).json({ success: false, message: 'String QRIS Statis tidak boleh kosong' });
+    }
+    await db.saveStaticQris(qrisString);
+    logActivity('SUCCESS', '[SETTINGS] Kode QRIS Statis Merchant berhasil disimpan ke Database PostgreSQL!');
+    res.json({ success: true, message: 'Kode QRIS Statis Merchant berhasil disimpan ke Database PostgreSQL!' });
+});
+
 module.exports = router;

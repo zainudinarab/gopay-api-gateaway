@@ -716,6 +716,23 @@ function renderAdminDashboard(sessionDataOrExists, dbType = 'SQLite WAL', sessio
                         </div>
                         `}
                     </div>
+
+                    <!-- Static QRIS Configuration Card -->
+                    <div class="panel-card" style="margin-top: 24px;">
+                        <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 12px;">📷 Konfigurasi String QRIS Statis Merchant</h3>
+                        <p style="font-size: 13.5px; color: var(--text-muted); margin-bottom: 16px;">
+                            String QRIS Statis ini digunakan oleh gateway untuk membuat QRIS Dinamis (kode unik pembayaran). Disimpan secara aman & permanen di Database PostgreSQL.
+                        </p>
+
+                        <div class="form-group" style="margin-bottom: 16px;">
+                            <label for="inp-static-qris">String QRIS Statis (Format EMVCo / GoPay / GoBiz)</label>
+                            <textarea id="inp-static-qris" rows="4" style="width: 100%; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; padding: 12px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px; color: var(--accent-cyan);" placeholder="00020101021126610014COM.GO-JEK.WWW..."></textarea>
+                        </div>
+
+                        <button class="btn-primary" id="btn-save-qris" onclick="saveStaticQrisConfig()" style="background: linear-gradient(135deg, #0284c7, #0369a1); font-weight: 600;">
+                            💾 Simpan String QRIS ke Database PostgreSQL
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Tab 2: Daftar Order QRIS (Active Default) -->
@@ -1547,7 +1564,7 @@ User-Agent: GoPay-Gateway-Webhook-Worker/1.0</pre>
         }
 
         async function logoutSession() {
-            if (!confirm('Apakah Anda yakin ingin MENGHAPUS file sesi login GoBiz Merchant dari server?\\n\\nPerhatian: Gateway tidak dapat mengecek transaksi otomatis sampai Anda melakukan verifikasi OTP ulang.')) return;
+            if (!confirm('Apakah Anda yakin ingin MENGHAPUS file sesi login GoBiz Merchant dari server?\n\nPerhatian: Gateway tidak dapat mengecek transaksi otomatis sampai Anda melakukan verifikasi OTP ulang.')) return;
             try {
                 const res = await fetch('/api/login/logout', { 
                     method: 'POST',
@@ -1564,6 +1581,57 @@ User-Agent: GoPay-Gateway-Webhook-Worker/1.0</pre>
                 alert('Error: ' + e.message);
             }
         }
+
+        async function loadStaticQrisConfig() {
+            try {
+                const res = await fetch('/api/settings/qris');
+                const data = await res.json();
+                if (data.success && data.qris_string) {
+                    const el = document.getElementById('inp-static-qris');
+                    if (el) el.value = data.qris_string;
+                }
+            } catch (e) {}
+        }
+
+        async function saveStaticQrisConfig() {
+            const qrisStr = (document.getElementById('inp-static-qris')?.value || '').trim();
+            if (!qrisStr) {
+                showAlert('error', 'Silakan masukkan String Kode QRIS Statis Merchant.');
+                return;
+            }
+
+            const btn = document.getElementById('btn-save-qris');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerText = 'Menyimpan ke Database PostgreSQL...';
+            }
+
+            try {
+                const res = await fetch('/api/settings/qris', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-admin-password': adminPass
+                    },
+                    body: JSON.stringify({ qris_string: qrisStr, admin_password: adminPass })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showAlert('success', data.message);
+                } else {
+                    showAlert('error', data.message || 'Gagal menyimpan QRIS ke Database');
+                }
+            } catch (err) {
+                showAlert('error', 'Error: ' + err.message);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerText = '💾 Simpan String QRIS ke Database PostgreSQL';
+                }
+            }
+        }
+
+        setTimeout(loadStaticQrisConfig, 500);
     </script>
 </body>
 </html>`;

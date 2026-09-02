@@ -100,6 +100,12 @@ if (isPostgres) {
                         session_data TEXT NOT NULL,
                         updated_at BIGINT NOT NULL
                     );
+
+                    CREATE TABLE IF NOT EXISTS merchant_settings (
+                        setting_key VARCHAR(100) PRIMARY KEY,
+                        setting_value TEXT NOT NULL,
+                        updated_at BIGINT NOT NULL
+                    );
                 `);
                 client.release();
                 console.log(`[DATABASE] Connected & Schema Initialized on PostgreSQL (${targetDbName})!`);
@@ -167,6 +173,12 @@ if (isPostgres) {
         CREATE TABLE IF NOT EXISTS merchant_sessions (
             session_key TEXT PRIMARY KEY,
             session_data TEXT NOT NULL,
+            updated_at INTEGER NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS merchant_settings (
+            setting_key TEXT PRIMARY KEY,
+            setting_value TEXT NOT NULL,
             updated_at INTEGER NOT NULL
         );
     `);
@@ -779,6 +791,57 @@ module.exports = {
         } else {
             sqliteDb.prepare(`DELETE FROM merchant_sessions WHERE session_key = ?`).run(key);
         }
+    },
+
+    async saveSetting(key, val) {
+        if (!key) return;
+        const strVal = String(val || '');
+        const now = Date.now();
+        if (isPostgres) {
+            try {
+                await pgPool.query(`
+                    INSERT INTO merchant_settings (setting_key, setting_value, updated_at)
+                    VALUES ($1, $2, $3)
+                    ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = EXCLUDED.updated_at
+                `, [key, strVal, now]);
+            } catch (e) {
+                console.error('[PG SAVE SETTING ERROR]:', e.message);
+            }
+        } else {
+            sqliteDb.prepare(`
+                INSERT OR REPLACE INTO merchant_settings (setting_key, setting_value, updated_at)
+                VALUES (?, ?, ?)
+            `).run(key, strVal, now);
+        }
+    },
+
+    async getSetting(key) {
+        if (!key) return null;
+        if (isPostgres) {
+            try {
+                const res = await pgPool.query(`SELECT setting_value FROM merchant_settings WHERE setting_key = $1`, [key]);
+                return res.rows.length > 0 ? res.rows[0].setting_value : null;
+            } catch (e) {
+                return null;
+            }
+        } else {
+            try {
+                const row = sqliteDb.prepare(`SELECT setting_value FROM merchant_settings WHERE setting_key = ?`).get(key);
+                return row ? row.setting_value : null;
+            } catch (e) {
+                return null;
+            }
+        }
+    },
+
+    async getStaticQris() {
+        const val = await this.getSetting('gopay_static_qris');
+        return val || process.env.GOPAY_STATIC_QRIS || '';
+    },
+
+    async saveStaticQris(qrisString) {
+        if (!qrisString) return;
+        await this.saveSetting('gopay_static_qris', qrisString.trim());
     },
 
     isPostgres,
