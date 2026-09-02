@@ -126,10 +126,10 @@ function renderQrisCheckout(qris, req, qrImageUrl, expiresTimestamp, formattedAm
 
             btn.disabled = true;
             spinner.style.display = 'inline-block';
-            label.innerText = 'Memeriksa...';
+            label.innerText = 'Memeriksa ke GoPay...';
 
             try {
-                const res = await fetch('/api/qr-status/' + qrisId);
+                const res = await fetch('/api/qr-status/' + qrisId + '?force=true');
                 const data = await res.json();
 
                 if (data.success && data.paid) {

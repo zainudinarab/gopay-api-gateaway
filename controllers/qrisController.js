@@ -107,8 +107,9 @@ const getQrStatus = async (req, res) => {
         return res.json({ success: false, paid: false, status: 'EXPIRED', message: 'QRIS sudah kedaluwarsa' });
     }
 
+    const forceRefresh = req.query.force !== 'false' && req.query.refresh !== 'false';
     try {
-        const matched = await verifyPayment(qris.amount, qris.createdAt, null, req.headers['user-agent'], qrisId);
+        const matched = await verifyPayment(qris.amount, qris.createdAt, null, req.headers['user-agent'], qrisId, forceRefresh);
         if (matched) {
             logActivity('SUCCESS', `Pembayaran QRIS ID ${qrisId} terverifikasi lunas untuk nominal Rp ${qris.amount}`);
             return res.json({ success: true, paid: true, status: 'PAID', transaction: matched });

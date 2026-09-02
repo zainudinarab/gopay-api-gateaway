@@ -41,10 +41,10 @@ async function autoLoginGojek() {
     });
 }
 
-async function fetchCachedTransactions(headers, customMerchantId) {
+async function fetchCachedTransactions(headers, customMerchantId, forceRefresh = false) {
     const now = new Date();
     const nowMs = now.getTime();
-    if (mutationCache.data && (nowMs - mutationCache.fetchedAt) < mutationCache.ttl) {
+    if (!forceRefresh && mutationCache.data && (nowMs - mutationCache.fetchedAt) < mutationCache.ttl) {
         return mutationCache.data;
     }
 
@@ -73,7 +73,10 @@ async function fetchCachedTransactions(headers, customMerchantId) {
     return txList;
 }
 
-async function verifyPayment(targetAmount, orderCreationTime = null, customMerchantId = null, userAgent = null, qrisId = null) {
+async function verifyPayment(targetAmount, orderCreationTime = null, customMerchantId = null, userAgent = null, qrisId = null, forceRefresh = false) {
+    if (forceRefresh) {
+        mutationCache.data = null;
+    }
     let headers = await sessionManager.getValidHeaders(userAgent);
 
     if (!headers && process.env.GOPAY_EMAIL && process.env.GOPAY_PASSWORD) {
@@ -88,7 +91,7 @@ async function verifyPayment(targetAmount, orderCreationTime = null, customMerch
     let rawTransactions;
 
     try {
-        rawTransactions = await fetchCachedTransactions(headers, merchantId);
+        rawTransactions = await fetchCachedTransactions(headers, merchantId, forceRefresh);
     } catch (firstErr) {
         if (firstErr.response && firstErr.response.status === 401) {
             logActivity('WARNING', 'Sesi expired (401). Memulai auto-refresh...');
@@ -96,7 +99,7 @@ async function verifyPayment(targetAmount, orderCreationTime = null, customMerch
             if (refreshed) {
                 const newHeaders = await sessionManager.getValidHeaders(userAgent);
                 mutationCache.data = null;
-                rawTransactions = await fetchCachedTransactions(newHeaders, merchantId);
+                rawTransactions = await fetchCachedTransactions(newHeaders, merchantId, true);
             } else {
                 throw firstErr;
             }
