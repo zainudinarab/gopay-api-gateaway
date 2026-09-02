@@ -1734,9 +1734,7 @@ User-Agent: GoPay-Gateway-Webhook-Worker/1.0</pre>
                         const parsedDetails = document.getElementById('qris-parsed-details');
                         if (parsedBox && parsedDetails) {
                             parsedBox.style.display = 'block';
-                            parsedDetails.innerHTML = `
-                                <div>📱 <strong>String QRIS (EMVCo)</strong>: <code style="color: var(--accent-cyan); font-family: 'JetBrains Mono', monospace; font-size: 11.5px;">${qrisText.slice(0, 45)}...${qrisText.slice(-20)}</code></div>
-                            `;
+                            parsedDetails.innerHTML = '<div>📱 <strong>String QRIS (EMVCo)</strong>: <code style="color: var(--accent-cyan); font-family: \'JetBrains Mono\', monospace; font-size: 11.5px;">' + qrisText.slice(0, 45) + '...' + qrisText.slice(-20) + '</code></div>';
                         }
 
                         showAlert('success', 'Kode QRIS Berhasil Dipindai! Menyimpan string ke Database PostgreSQL...');
