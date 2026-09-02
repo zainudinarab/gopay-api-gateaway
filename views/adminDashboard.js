@@ -1564,7 +1564,7 @@ User-Agent: GoPay-Gateway-Webhook-Worker/1.0</pre>
         }
 
         async function logoutSession() {
-            if (!confirm('Apakah Anda yakin ingin MENGHAPUS file sesi login GoBiz Merchant dari server?\n\nPerhatian: Gateway tidak dapat mengecek transaksi otomatis sampai Anda melakukan verifikasi OTP ulang.')) return;
+            if (!confirm('Apakah Anda yakin ingin MENGHAPUS sesi login GoBiz Merchant dari server? Perhatian: Gateway tidak dapat mengecek transaksi otomatis sampai Anda melakukan verifikasi OTP ulang.')) return;
             try {
                 const res = await fetch('/api/login/logout', { 
                     method: 'POST',
