@@ -765,6 +765,47 @@ function renderAdminDashboard(sessionDataOrExists, dbType = 'SQLite WAL', sessio
 
                 <!-- Tab 2: Daftar Order QRIS (Active Default) -->
                 <div class="tab-content active" id="tab-orders">
+
+                    <!-- Form Generator QRIS Dinamis Baru -->
+                    <div class="panel-card" style="margin-bottom: 24px; background: linear-gradient(135deg, rgba(31, 41, 55, 0.9), rgba(17, 24, 39, 0.9)); border: 1px solid rgba(56, 189, 248, 0.25);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                            <div>
+                                <h3 style="font-size: 17.5px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px;">
+                                    <span style="font-size: 20px;">⚡</span> Generator Order QRIS Dinamis Baru
+                                </h3>
+                                <p style="font-size: 13px; color: var(--text-muted); margin: 2px 0 0 0;">
+                                    Buat transaksi QRIS dinamis baru dengan kode unik otomatis (100% Siap Dipindai Pelanggan).
+                                </p>
+                            </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 16px;">
+                            <div class="form-group" style="margin: 0;">
+                                <label for="inp-gen-amount" style="font-size: 12px; font-weight: 700;">Nominal Pembayaran (Rp) *</label>
+                                <input type="number" id="inp-gen-amount" placeholder="Contoh: 10000" style="font-weight: 700; font-size: 15px; color: var(--accent-green);">
+                            </div>
+
+                            <div class="form-group" style="margin: 0;">
+                                <label for="inp-gen-ref" style="font-size: 12px; font-weight: 700;">Order ID / Ref ID (Opsional)</label>
+                                <input type="text" id="inp-gen-ref" placeholder="Contoh: INV-20260902-001">
+                            </div>
+
+                            <div class="form-group" style="margin: 0;">
+                                <label for="inp-gen-hours" style="font-size: 12px; font-weight: 700;">Kedaluwarsa (Jam)</label>
+                                <input type="number" id="inp-gen-hours" value="12" min="1" max="72">
+                            </div>
+
+                            <div class="form-group" style="margin: 0;">
+                                <label for="inp-gen-webhook" style="font-size: 12px; font-weight: 700;">Webhook Callback URL (Opsional)</label>
+                                <input type="url" id="inp-gen-webhook" placeholder="https://domain.com/webhook">
+                            </div>
+                        </div>
+
+                        <button class="btn-primary" id="btn-generate-qris" onclick="generateNewQrisOrder()" style="background: linear-gradient(135deg, #10b981, #059669); font-weight: 700; font-size: 14px; padding: 10px 22px; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);">
+                            ✨ Generate Kode QRIS Pembayaran Baru
+                        </button>
+                    </div>
+
                     <div class="panel-card">
                         <div class="toolbar">
                             <div>
@@ -1077,6 +1118,32 @@ User-Agent: GoPay-Gateway-Webhook-Worker/1.0</pre>
             <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:24px;">
                 <button class="btn-primary btn-sm" style="background:#374151; box-shadow:none;" onclick="closeJodohkanModal()">Batal</button>
                 <button class="btn-primary btn-sm" id="btn-modal-submit" onclick="submitJodohkanModal()">💾 Simpan & Jodohkan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Popup QRIS Created Result -->
+    <div id="modal-qris-created" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); backdrop-filter:blur(8px); z-index:9999; align-items:center; justify-content:center;">
+        <div style="background: var(--bg-card); border:1px solid rgba(56, 189, 248, 0.4); border-radius:20px; width:90%; max-width:440px; padding:28px; text-align:center; box-shadow:0 25px 50px -12px rgba(0,0,0,0.7); position:relative;">
+            <button onclick="closeQrisModal()" style="position:absolute; top:16px; right:16px; background:none; border:none; color:var(--text-muted); font-size:22px; cursor:pointer;">✕</button>
+            
+            <div style="font-size: 13px; font-weight: 700; color: var(--accent-green); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">🎉 Order QRIS Berhasil Dibuat!</div>
+            <h3 id="modal-qris-amount" style="font-size: 26px; font-weight: 800; color: #fff; margin: 0 0 16px 0;">Rp 0</h3>
+
+            <div style="background: #fff; padding: 16px; border-radius: 14px; display: inline-block; margin-bottom: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.4);">
+                <img id="modal-qris-qrimg" style="width: 220px; height: 220px; display: block;" alt="QRIS Code">
+            </div>
+
+            <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px; text-align: left; font-size: 12.5px; margin-bottom: 20px; line-height: 1.7;">
+                <div>🆔 <strong>QRIS ID</strong>: <span id="modal-qris-id" style="font-family: 'JetBrains Mono', monospace; color: var(--accent-cyan); font-weight: 700;"></span></div>
+                <div>🔢 <strong>Nominal Unik Akhir</strong>: <span id="modal-qris-unique" style="color: #f59e0b; font-weight: 800;"></span></div>
+                <div>🏷️ <strong>Ref ID</strong>: <span id="modal-qris-ref" style="color: var(--text-muted);"></span></div>
+                <div>🔗 <strong>Halaman Checkout</strong>: <a id="modal-qris-link" href="#" target="_blank" style="color: var(--accent-cyan); word-break: break-all; font-size: 11.5px;"></a></div>
+            </div>
+
+            <div style="display: flex; gap: 12px;">
+                <button class="btn-primary" onclick="copyQrisLink()" style="flex: 1; background: rgba(56, 189, 248, 0.15); border: 1px solid var(--accent-cyan); color: var(--accent-cyan); font-weight: 600;">📋 Copy Link</button>
+                <button class="btn-primary" onclick="openQrisCheckoutLink()" style="flex: 1; background: linear-gradient(135deg, #0284c7, #0369a1); font-weight: 600;">🔗 Buka Checkout</button>
             </div>
         </div>
     </div>
@@ -1756,6 +1823,101 @@ User-Agent: GoPay-Gateway-Webhook-Worker/1.0</pre>
                     btn.innerHTML = '🔍 Pindai & Ekstrak Kode QRIS';
                 }
             }
+        }
+
+        let activeGeneratedQrisUrl = '';
+
+        async function generateNewQrisOrder() {
+            const amount = document.getElementById('inp-gen-amount')?.value;
+            const refId = document.getElementById('inp-gen-ref')?.value?.trim();
+            const hours = document.getElementById('inp-gen-hours')?.value || 12;
+            const webhook = document.getElementById('inp-gen-webhook')?.value?.trim();
+
+            if (!amount || isNaN(amount) || parseInt(amount) < 1) {
+                showAlert('error', 'Silakan masukkan Nominal Pembayaran (amount) minimal Rp 1.');
+                return;
+            }
+
+            const btn = document.getElementById('btn-generate-qris');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '⏳ Menghasilkan QRIS Dinamis...';
+            }
+
+            try {
+                const payload = {
+                    amount: parseInt(amount),
+                    app_id: 'admin',
+                    admin_password: adminPass,
+                    expires_in_hours: parseFloat(hours)
+                };
+                if (refId) payload.client_ref_id = refId;
+                if (webhook) payload.webhook_url = webhook;
+
+                const res = await fetch('/api/create-qris', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-admin-password': adminPass,
+                        'x-app-id': 'admin'
+                    },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+
+                if (data.success && data.qris_id) {
+                    showAlert('success', 'Order QRIS Dinamis berhasil dibuat!');
+                    
+                    const checkoutUrl = data.checkout_url || (location.origin + '/qr-checkout/' + data.qris_id);
+                    activeGeneratedQrisUrl = checkoutUrl;
+
+                    const formattedAmt = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(data.amount);
+                    document.getElementById('modal-qris-amount').innerText = formattedAmt;
+                    document.getElementById('modal-qris-qrimg').src = data.qr_image_url || ('/qr-checkout/' + data.qris_id + '.png');
+                    document.getElementById('modal-qris-id').innerText = data.qris_id;
+                    document.getElementById('modal-qris-unique').innerText = 'Rp ' + new Intl.NumberFormat('id-ID').format(data.amount) + ' (Kode Unik: ' + (data.unique_code || '-') + ')';
+                    document.getElementById('modal-qris-ref').innerText = data.client_ref_id || '-';
+                    
+                    const linkEl = document.getElementById('modal-qris-link');
+                    if (linkEl) {
+                        linkEl.href = checkoutUrl;
+                        linkEl.innerText = checkoutUrl;
+                    }
+
+                    document.getElementById('modal-qris-created').style.display = 'flex';
+
+                    document.getElementById('inp-gen-amount').value = '';
+                    document.getElementById('inp-gen-ref').value = '';
+                    loadOrdersTable();
+                } else {
+                    showAlert('error', data.message || 'Gagal membuat QRIS Dinamis');
+                }
+            } catch (err) {
+                showAlert('error', 'Error: ' + err.message);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '✨ Generate Kode QRIS Pembayaran Baru';
+                }
+            }
+        }
+
+        function closeQrisModal() {
+            document.getElementById('modal-qris-created').style.display = 'none';
+        }
+
+        function copyQrisLink() {
+            if (!activeGeneratedQrisUrl) return;
+            navigator.clipboard.writeText(activeGeneratedQrisUrl).then(() => {
+                showAlert('success', 'Link Halaman Checkout QRIS berhasil disalin!');
+            }).catch(() => {
+                alert('Link QRIS: ' + activeGeneratedQrisUrl);
+            });
+        }
+
+        function openQrisCheckoutLink() {
+            if (!activeGeneratedQrisUrl) return;
+            window.open(activeGeneratedQrisUrl, '_blank');
         }
 
         setTimeout(loadStaticQrisConfig, 500);
