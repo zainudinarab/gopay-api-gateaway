@@ -30,8 +30,8 @@ const requestOTP = (req, res) => {
     }
 
     logActivity('INFO', `[WEB LOGIN] Meminta Kode OTP untuk nomor: ${phone}`);
-    const pythonScript = path.join(__dirname, '..', 'login_gojek.py');
-    const proc = spawn('python', [pythonScript, phone], { cwd: path.join(__dirname, '..') });
+    const loginScript = path.join(__dirname, '..', 'login.js');
+    const proc = spawn(process.execPath, [loginScript, phone], { cwd: path.join(__dirname, '..') });
     activeLoginProcess = proc;
 
     let responseSent = false;

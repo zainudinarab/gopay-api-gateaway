@@ -14,9 +14,9 @@ const mutationCache = {
 
 async function autoLoginGojek() {
     logActivity('INFO', '[AUTO-LOGIN] Memulai auto-login otomatis ke GoBiz...');
-    const pythonScript = path.join(__dirname, '..', 'login_gojek.py');
+    const loginScript = path.join(__dirname, '..', 'login.js');
     return new Promise((resolve, reject) => {
-        const pyProc = spawn('python', [pythonScript], { cwd: path.join(__dirname, '..') });
+        const pyProc = spawn(process.execPath, [loginScript], { cwd: path.join(__dirname, '..') });
         let stdoutData = '';
         let stderrData = '';
 
