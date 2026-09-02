@@ -106,6 +106,14 @@ if (isPostgres) {
                         setting_value TEXT NOT NULL,
                         updated_at BIGINT NOT NULL
                     );
+
+                    if (process.env.GOPAY_STATIC_QRIS && process.env.GOPAY_STATIC_QRIS.trim()) {
+                        await client.query(`
+                            INSERT INTO merchant_settings (setting_key, setting_value, updated_at)
+                            VALUES ('gopay_static_qris', $1, $2)
+                            ON CONFLICT (setting_key) DO NOTHING
+                        `, [process.env.GOPAY_STATIC_QRIS.trim(), Date.now()]);
+                    }
                 `);
                 client.release();
                 console.log(`[DATABASE] Connected & Schema Initialized on PostgreSQL (${targetDbName})!`);
