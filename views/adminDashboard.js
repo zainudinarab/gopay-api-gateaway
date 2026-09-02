@@ -21,8 +21,21 @@ function renderAdminDashboard(sessionDataOrExists, dbType = 'SQLite WAL', sessio
     <title>Admin Panel - GoPay Merchant Gateway</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
     <style>
         :root {
             --bg-body: #0b0f19;
@@ -779,7 +792,7 @@ function renderAdminDashboard(sessionDataOrExists, dbType = 'SQLite WAL', sessio
                             </div>
                         </div>
 
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 16px;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 12px;">
                             <div class="form-group" style="margin: 0;">
                                 <label for="inp-gen-amount" style="font-size: 12px; font-weight: 700;">Nominal Pembayaran (Rp) *</label>
                                 <input type="number" id="inp-gen-amount" placeholder="Contoh: 10000" style="font-weight: 700; font-size: 15px; color: var(--accent-green);">
@@ -799,6 +812,17 @@ function renderAdminDashboard(sessionDataOrExists, dbType = 'SQLite WAL', sessio
                                 <label for="inp-gen-webhook" style="font-size: 12px; font-weight: 700;">Webhook Callback URL (Opsional)</label>
                                 <input type="url" id="inp-gen-webhook" placeholder="https://domain.com/webhook">
                             </div>
+                        </div>
+
+                        <!-- Quick Nominal Presets -->
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; align-items: center;">
+                            <span style="font-size: 11.5px; color: var(--text-muted); font-weight: 600;">Nominal Cepat:</span>
+                            <button type="button" onclick="setGenAmount(10000)" style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.3); color: var(--accent-cyan); font-size: 11.5px; font-weight: 700; padding: 4px 12px; border-radius: 20px; cursor: pointer; transition: all 0.2s ease;">Rp 10.000</button>
+                            <button type="button" onclick="setGenAmount(25000)" style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.3); color: var(--accent-cyan); font-size: 11.5px; font-weight: 700; padding: 4px 12px; border-radius: 20px; cursor: pointer; transition: all 0.2s ease;">Rp 25.000</button>
+                            <button type="button" onclick="setGenAmount(50000)" style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.3); color: var(--accent-cyan); font-size: 11.5px; font-weight: 700; padding: 4px 12px; border-radius: 20px; cursor: pointer; transition: all 0.2s ease;">Rp 50.000</button>
+                            <button type="button" onclick="setGenAmount(100000)" style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.3); color: var(--accent-cyan); font-size: 11.5px; font-weight: 700; padding: 4px 12px; border-radius: 20px; cursor: pointer; transition: all 0.2s ease;">Rp 100.000</button>
+                            <button type="button" onclick="setGenAmount(250000)" style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.3); color: var(--accent-cyan); font-size: 11.5px; font-weight: 700; padding: 4px 12px; border-radius: 20px; cursor: pointer; transition: all 0.2s ease;">Rp 250.000</button>
+                            <button type="button" onclick="setGenAmount(500000)" style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.3); color: var(--accent-cyan); font-size: 11.5px; font-weight: 700; padding: 4px 12px; border-radius: 20px; cursor: pointer; transition: all 0.2s ease;">Rp 500.000</button>
                         </div>
 
                         <button class="btn-primary" id="btn-generate-qris" onclick="generateNewQrisOrder()" style="background: linear-gradient(135deg, #10b981, #059669); font-weight: 700; font-size: 14px; padding: 10px 22px; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);">
@@ -1826,6 +1850,14 @@ User-Agent: GoPay-Gateway-Webhook-Worker/1.0</pre>
         }
 
         let activeGeneratedQrisUrl = '';
+
+        function setGenAmount(val) {
+            const el = document.getElementById('inp-gen-amount');
+            if (el) {
+                el.value = val;
+                el.focus();
+            }
+        }
 
         async function generateNewQrisOrder() {
             const amount = document.getElementById('inp-gen-amount')?.value;
