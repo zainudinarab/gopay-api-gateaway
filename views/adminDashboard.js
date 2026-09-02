@@ -719,13 +719,20 @@ function renderAdminDashboard(sessionDataOrExists, dbType = 'SQLite WAL', sessio
 
                     <!-- Static QRIS Configuration Card -->
                     <div class="panel-card" style="margin-top: 24px;">
-                        <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 12px;">📷 Konfigurasi String QRIS Statis Merchant</h3>
+                        <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 8px;">📷 Konfigurasi & Upload QRIS Statis Merchant</h3>
                         <p style="font-size: 13.5px; color: var(--text-muted); margin-bottom: 16px;">
-                            String QRIS Statis ini digunakan oleh gateway untuk membuat QRIS Dinamis (kode unik pembayaran). Disimpan secara aman & permanen di Database PostgreSQL.
+                            Unggah gambar poster / stiker QRIS resmi toko Anda (JPG/PNG) atau paste string EMVCo. Sistem akan otomatis memindai QR code dari gambar dan menyimpannya ke Database PostgreSQL.
                         </p>
 
+                        <div style="border: 2px dashed rgba(56, 189, 248, 0.3); background: rgba(56, 189, 248, 0.04); border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 20px; cursor: pointer; transition: all 0.2s ease;" onclick="document.getElementById('file-qris-image').click()" onmouseover="this.style.borderColor='var(--accent-cyan)'" onmouseout="this.style.borderColor='rgba(56, 189, 248, 0.3)'">
+                            <div style="font-size: 32px; margin-bottom: 8px;">🖼️</div>
+                            <div style="font-size: 14px; font-weight: 700; color: var(--accent-cyan);">Klik untuk Unggah Gambar Poster / Stiker QRIS</div>
+                            <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Mendukung PNG, JPG, JPEG (QR Code Otomatis Di-Scan oleh Server)</div>
+                            <input type="file" id="file-qris-image" accept="image/*" style="display: none;" onchange="uploadQrisImage(event)">
+                        </div>
+
                         <div class="form-group" style="margin-bottom: 16px;">
-                            <label for="inp-static-qris">String QRIS Statis (Format EMVCo / GoPay / GoBiz)</label>
+                            <label for="inp-static-qris">String QRIS Statis Hasil Scan / Input Manual</label>
                             <textarea id="inp-static-qris" rows="4" style="width: 100%; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; padding: 12px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px; color: var(--accent-cyan);" placeholder="00020101021126610014COM.GO-JEK.WWW..."></textarea>
                         </div>
 
@@ -1629,6 +1636,38 @@ User-Agent: GoPay-Gateway-Webhook-Worker/1.0</pre>
                     btn.innerText = '💾 Simpan String QRIS ke Database PostgreSQL';
                 }
             }
+        }
+
+        async function uploadQrisImage(evt) {
+            const file = evt.target.files[0];
+            if (!file) return;
+
+            showAlert('info', 'Memindai & mendeteksi Kode QRIS dari gambar...');
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const base64Image = e.target.result;
+                try {
+                    const res = await fetch('/api/settings/upload-qris', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-admin-password': adminPass
+                        },
+                        body: JSON.stringify({ image: base64Image, admin_password: adminPass })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        showAlert('success', data.message);
+                        const el = document.getElementById('inp-static-qris');
+                        if (el) el.value = data.qris_string;
+                    } else {
+                        showAlert('error', data.message || 'Gagal memindai QR code dari gambar');
+                    }
+                } catch (err) {
+                    showAlert('error', 'Error: ' + err.message);
+                }
+            };
+            reader.readAsDataURL(file);
         }
 
         setTimeout(loadStaticQrisConfig, 500);

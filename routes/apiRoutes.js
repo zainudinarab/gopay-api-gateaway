@@ -55,4 +55,38 @@ router.post('/settings/qris', adminPassAuth, async (req, res) => {
     res.json({ success: true, message: 'Kode QRIS Statis Merchant berhasil disimpan ke Database PostgreSQL!' });
 });
 
+router.post('/settings/upload-qris', adminPassAuth, async (req, res) => {
+    const db = require('../db');
+    const { Jimp } = require('jimp');
+    const jsQR = require('jsqr');
+
+    try {
+        const imageBase64 = req.body?.image || req.body?.image_base64;
+        if (!imageBase64) {
+            return res.status(400).json({ success: false, message: 'File gambar QRIS (Base64) wajib diunggah.' });
+        }
+
+        const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+        const buffer = Buffer.from(base64Data, 'base64');
+        const img = await Jimp.read(buffer);
+
+        const code = jsQR(new Uint8ClampedArray(img.bitmap.data), img.bitmap.width, img.bitmap.height);
+        if (!code || !code.data) {
+            return res.status(400).json({ success: false, message: 'Gagal mendeteksi QR Code dari gambar yang diunggah. Pastikan gambar jelas & tajam.' });
+        }
+
+        const qrisString = code.data.trim();
+        await db.saveStaticQris(qrisString);
+        logActivity('SUCCESS', `[SETTINGS] Berhasil mendeteksi & menyimpan Kode QRIS Statis dari Gambar ke Database PostgreSQL!`);
+
+        res.json({
+            success: true,
+            message: 'Berhasil mendeteksi & menyimpan Kode QRIS Statis dari Gambar ke Database PostgreSQL!',
+            qris_string: qrisString
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, message: 'Gagal memproses gambar QRIS: ' + err.message });
+    }
+});
+
 module.exports = router;
