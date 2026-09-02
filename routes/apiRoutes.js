@@ -8,7 +8,7 @@ const qrisController = require('../controllers/qrisController');
 const orderController = require('../controllers/orderController');
 const transactionController = require('../controllers/transactionController');
 const webhookController = require('../controllers/webhookController');
-const { activityLogs } = require('../services/loggerService');
+const { activityLogs, logActivity } = require('../services/loggerService');
 
 // Auth Endpoints
 router.post('/login/admin-auth', authController.adminAuth);
