@@ -722,14 +722,34 @@ function renderAdminDashboard(sessionDataOrExists, dbType = 'SQLite WAL', sessio
                     <div class="panel-card" style="margin-top: 24px;">
                         <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 8px;">📷 Konfigurasi & Upload QRIS Statis Merchant</h3>
                         <p style="font-size: 13.5px; color: var(--text-muted); margin-bottom: 16px;">
-                            Unggah gambar poster / stiker QRIS resmi toko Anda (JPG/PNG) atau paste string EMVCo. Sistem akan otomatis memindai QR code dari gambar dan menyimpannya ke Database PostgreSQL.
+                            Pilih gambar poster/stiker QRIS resmi toko Anda (JPG/PNG). Gambar akan ditampilkan untuk Anda pratinjau, lalu klik tombol <strong>🔍 Pindai & Ekstrak Kode QRIS</strong> untuk membaca data QR code.
                         </p>
 
-                        <div style="border: 2px dashed rgba(56, 189, 248, 0.3); background: rgba(56, 189, 248, 0.04); border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 20px; cursor: pointer; transition: all 0.2s ease;" onclick="document.getElementById('file-qris-image').click()" onmouseover="this.style.borderColor='var(--accent-cyan)'" onmouseout="this.style.borderColor='rgba(56, 189, 248, 0.3)'">
-                            <div style="font-size: 32px; margin-bottom: 8px;">🖼️</div>
-                            <div style="font-size: 14px; font-weight: 700; color: var(--accent-cyan);">Klik untuk Unggah Gambar Poster / Stiker QRIS</div>
-                            <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Mendukung PNG, JPG, JPEG (QR Code Otomatis Di-Scan oleh Server)</div>
-                            <input type="file" id="file-qris-image" accept="image/*" style="display: none;" onchange="uploadQrisImage(event)">
+                        <!-- Upload Dropzone -->
+                        <div style="border: 2px dashed rgba(56, 189, 248, 0.35); background: rgba(56, 189, 248, 0.04); border-radius: 12px; padding: 22px; text-align: center; margin-bottom: 20px; cursor: pointer; transition: all 0.2s ease;" onclick="document.getElementById('file-qris-image').click()" onmouseover="this.style.borderColor='var(--accent-cyan)'" onmouseout="this.style.borderColor='rgba(56, 189, 248, 0.35)'">
+                            <div style="font-size: 36px; margin-bottom: 8px;">🖼️</div>
+                            <div style="font-size: 14.5px; font-weight: 700; color: var(--accent-cyan);">Pilih / Unggah Gambar Poster QRIS Toko</div>
+                            <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Klik di sini untuk memilih file gambar (PNG, JPG, JPEG)</div>
+                            <input type="file" id="file-qris-image" accept="image/*" style="display: none;" onchange="previewQrisImage(event)">
+                        </div>
+
+                        <!-- Image Preview Box (Hidden until image selected) -->
+                        <div id="qris-preview-container" style="display: none; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 12px; padding: 18px; margin-bottom: 20px; text-align: center;">
+                            <div style="font-size: 12.5px; color: var(--accent-cyan); font-weight: 600; margin-bottom: 12px;">📸 Pratinjau Gambar QRIS yang Dipilih:</div>
+                            <div style="display: flex; justify-content: center; margin-bottom: 16px;">
+                                <img id="qris-preview-img" style="max-height: 280px; max-width: 100%; border-radius: 10px; border: 2px solid rgba(56, 189, 248, 0.4); box-shadow: 0 8px 24px rgba(0,0,0,0.4);" alt="Preview QRIS">
+                            </div>
+                            <button class="btn-primary" id="btn-scan-qris" onclick="processScanSelectedImage()" style="background: linear-gradient(135deg, #10b981, #059669); font-weight: 700; font-size: 14.5px; padding: 12px 24px; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3); margin: 0 auto; display: inline-flex; align-items: center; gap: 8px;">
+                                🔍 Pindai & Ekstrak Kode QRIS
+                            </button>
+                        </div>
+
+                        <!-- Decoded Info & Result Box (Hidden until scanned) -->
+                        <div id="qris-parsed-info" style="display: none; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 10px; padding: 14px; margin-bottom: 16px;">
+                            <div style="font-size: 13px; font-weight: 700; color: var(--accent-green); margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                                🟢 Kode QRIS Berhasil Dipindai & Diidentifikasi!
+                            </div>
+                            <div id="qris-parsed-details" style="font-size: 12.5px; color: var(--text-main); line-height: 1.6;"></div>
                         </div>
 
                         <div class="form-group" style="margin-bottom: 16px;">
@@ -1639,13 +1659,42 @@ User-Agent: GoPay-Gateway-Webhook-Worker/1.0</pre>
             }
         }
 
-        async function uploadQrisImage(evt) {
+        let selectedQrisImgElement = null;
+
+        function previewQrisImage(evt) {
             const file = evt.target.files[0];
             if (!file) return;
 
-            showAlert('info', 'Membaca & memindai QR code dari gambar di browser...');
             const reader = new FileReader();
             reader.onload = (e) => {
+                const previewImg = document.getElementById('qris-preview-img');
+                const previewContainer = document.getElementById('qris-preview-container');
+                const parsedBox = document.getElementById('qris-parsed-info');
+                
+                if (previewImg && previewContainer) {
+                    previewImg.src = e.target.result;
+                    previewContainer.style.display = 'block';
+                    if (parsedBox) parsedBox.style.display = 'none';
+                    selectedQrisImgElement = previewImg;
+                    showAlert('info', 'Gambar QRIS berhasil dipilih! Klik tombol "🔍 Pindai & Ekstrak Kode QRIS" untuk memproses.');
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function processScanSelectedImage() {
+            if (!selectedQrisImgElement || !selectedQrisImgElement.src) {
+                showAlert('error', 'Silakan pilih gambar poster QRIS terlebih dahulu.');
+                return;
+            }
+
+            const btn = document.getElementById('btn-scan-qris');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '⏳ Memindai Kode QR...';
+            }
+
+            try {
                 const img = new Image();
                 img.onload = async () => {
                     const canvas = document.createElement('canvas');
@@ -1663,7 +1712,6 @@ User-Agent: GoPay-Gateway-Webhook-Worker/1.0</pre>
                         }
                     }
 
-                    // Fallback to server decode if client jsQR didn't find barcode
                     if (!qrisText) {
                         try {
                             const res = await fetch('/api/settings/upload-qris', {
@@ -1681,15 +1729,35 @@ User-Agent: GoPay-Gateway-Webhook-Worker/1.0</pre>
                     if (qrisText) {
                         const el = document.getElementById('inp-static-qris');
                         if (el) el.value = qrisText;
-                        showAlert('success', 'QR Code berhasil dibaca! Menyimpan string teks ke Database PostgreSQL...');
+                        
+                        const parsedBox = document.getElementById('qris-parsed-info');
+                        const parsedDetails = document.getElementById('qris-parsed-details');
+                        if (parsedBox && parsedDetails) {
+                            parsedBox.style.display = 'block';
+                            parsedDetails.innerHTML = `
+                                <div>📱 <strong>String QRIS (EMVCo)</strong>: <code style="color: var(--accent-cyan); font-family: 'JetBrains Mono', monospace; font-size: 11.5px;">${qrisText.slice(0, 45)}...${qrisText.slice(-20)}</code></div>
+                            `;
+                        }
+
+                        showAlert('success', 'Kode QRIS Berhasil Dipindai! Menyimpan string ke Database PostgreSQL...');
                         await saveStaticQrisConfig();
                     } else {
                         showAlert('error', 'Gagal membaca QR Code dari gambar. Pastikan gambar jelas & tidak buram.');
                     }
+
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = '🔍 Pindai & Ekstrak Kode QRIS';
+                    }
                 };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
+                img.src = selectedQrisImgElement.src;
+            } catch (err) {
+                showAlert('error', 'Error: ' + err.message);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '🔍 Pindai & Ekstrak Kode QRIS';
+                }
+            }
         }
 
         setTimeout(loadStaticQrisConfig, 500);
