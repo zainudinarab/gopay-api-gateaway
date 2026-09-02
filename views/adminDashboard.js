@@ -779,55 +779,69 @@ function renderAdminDashboard(sessionDataOrExists, dbType = 'SQLite WAL', sessio
                 <!-- Tab 2: Daftar Order QRIS (Active Default) -->
                 <div class="tab-content active" id="tab-orders">
 
-                    <!-- Form Generator QRIS Dinamis Baru -->
-                    <div class="panel-card" style="margin-bottom: 24px; background: linear-gradient(135deg, rgba(31, 41, 55, 0.9), rgba(17, 24, 39, 0.9)); border: 1px solid rgba(56, 189, 248, 0.25);">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <!-- Form Generator QRIS Dinamis Baru (Tailwind Redesign) -->
+                    <div class="bg-slate-900/90 backdrop-blur-xl border border-sky-500/30 rounded-2xl p-6 mb-6 shadow-xl shadow-sky-950/20">
+                        <div class="flex items-center justify-between pb-4 mb-5 border-b border-slate-800">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 text-lg font-bold shadow-[0_0_12px_rgba(16,185,129,0.2)]">
+                                    ⚡
+                                </div>
+                                <div>
+                                    <h3 class="text-base font-bold text-white tracking-tight">Generator Order QRIS Dinamis Baru</h3>
+                                    <p class="text-xs text-slate-400 mt-0.5">Buat transaksi QRIS dinamis baru dengan nominal unik otomatis (100% Siap Dipindai Pelanggan).</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Input Fields Grid -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                             <div>
-                                <h3 style="font-size: 17.5px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px;">
-                                    <span style="font-size: 20px;">⚡</span> Generator Order QRIS Dinamis Baru
-                                </h3>
-                                <p style="font-size: 13px; color: var(--text-muted); margin: 2px 0 0 0;">
-                                    Buat transaksi QRIS dinamis baru dengan kode unik otomatis (100% Siap Dipindai Pelanggan).
-                                </p>
+                                <label for="inp-gen-amount" class="block text-xs font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Nominal Pembayaran (Rp) *</label>
+                                <div class="relative">
+                                    <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-emerald-400 font-bold text-sm">Rp</span>
+                                    <input type="number" id="inp-gen-amount" placeholder="10.000" class="w-full pl-10 pr-3 py-2.5 bg-slate-950/80 border border-slate-800 rounded-xl text-emerald-400 font-extrabold text-base focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all placeholder:text-slate-600">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label for="inp-gen-ref" class="block text-xs font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Order ID / Ref ID (Opsional)</label>
+                                <input type="text" id="inp-gen-ref" placeholder="Contoh: INV-20260902-001" class="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-800 rounded-xl text-slate-200 text-sm focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all placeholder:text-slate-600">
+                            </div>
+
+                            <div>
+                                <label for="inp-gen-hours" class="block text-xs font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Masa Kadaluwarsa</label>
+                                <select id="inp-gen-hours" class="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-800 rounded-xl text-slate-200 text-sm focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all">
+                                    <option value="1">1 Jam</option>
+                                    <option value="6">6 Jam</option>
+                                    <option value="12" selected>12 Jam (Default)</option>
+                                    <option value="24">24 Jam (1 Hari)</option>
+                                    <option value="48">48 Jam (2 Hari)</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label for="inp-gen-webhook" class="block text-xs font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Webhook Callback URL (Opsional)</label>
+                                <input type="url" id="inp-gen-webhook" placeholder="https://domain.com/webhook" class="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-800 rounded-xl text-slate-200 text-sm focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all placeholder:text-slate-600">
                             </div>
                         </div>
 
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 12px;">
-                            <div class="form-group" style="margin: 0;">
-                                <label for="inp-gen-amount" style="font-size: 12px; font-weight: 700;">Nominal Pembayaran (Rp) *</label>
-                                <input type="number" id="inp-gen-amount" placeholder="Contoh: 10000" style="font-weight: 700; font-size: 15px; color: var(--accent-green);">
-                            </div>
-
-                            <div class="form-group" style="margin: 0;">
-                                <label for="inp-gen-ref" style="font-size: 12px; font-weight: 700;">Order ID / Ref ID (Opsional)</label>
-                                <input type="text" id="inp-gen-ref" placeholder="Contoh: INV-20260902-001">
-                            </div>
-
-                            <div class="form-group" style="margin: 0;">
-                                <label for="inp-gen-hours" style="font-size: 12px; font-weight: 700;">Kedaluwarsa (Jam)</label>
-                                <input type="number" id="inp-gen-hours" value="12" min="1" max="72">
-                            </div>
-
-                            <div class="form-group" style="margin: 0;">
-                                <label for="inp-gen-webhook" style="font-size: 12px; font-weight: 700;">Webhook Callback URL (Opsional)</label>
-                                <input type="url" id="inp-gen-webhook" placeholder="https://domain.com/webhook">
-                            </div>
+                        <!-- Quick Nominal Preset Chips -->
+                        <div class="flex items-center gap-2 flex-wrap mb-5">
+                            <span class="text-xs font-semibold text-slate-400 mr-1">Pilihan Cepat:</span>
+                            <button type="button" onclick="setGenAmount(10000)" class="px-3 py-1 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 rounded-full text-sky-400 text-xs font-bold transition-all hover:scale-105 active:scale-95">Rp 10.000</button>
+                            <button type="button" onclick="setGenAmount(25000)" class="px-3 py-1 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 rounded-full text-sky-400 text-xs font-bold transition-all hover:scale-105 active:scale-95">Rp 25.000</button>
+                            <button type="button" onclick="setGenAmount(50000)" class="px-3 py-1 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 rounded-full text-sky-400 text-xs font-bold transition-all hover:scale-105 active:scale-95">Rp 50.000</button>
+                            <button type="button" onclick="setGenAmount(100000)" class="px-3 py-1 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 rounded-full text-sky-400 text-xs font-bold transition-all hover:scale-105 active:scale-95">Rp 100.000</button>
+                            <button type="button" onclick="setGenAmount(250000)" class="px-3 py-1 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 rounded-full text-sky-400 text-xs font-bold transition-all hover:scale-105 active:scale-95">Rp 250.000</button>
+                            <button type="button" onclick="setGenAmount(500000)" class="px-3 py-1 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 rounded-full text-sky-400 text-xs font-bold transition-all hover:scale-105 active:scale-95">Rp 500.000</button>
                         </div>
 
-                        <!-- Quick Nominal Presets -->
-                        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; align-items: center;">
-                            <span style="font-size: 11.5px; color: var(--text-muted); font-weight: 600;">Nominal Cepat:</span>
-                            <button type="button" onclick="setGenAmount(10000)" style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.3); color: var(--accent-cyan); font-size: 11.5px; font-weight: 700; padding: 4px 12px; border-radius: 20px; cursor: pointer; transition: all 0.2s ease;">Rp 10.000</button>
-                            <button type="button" onclick="setGenAmount(25000)" style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.3); color: var(--accent-cyan); font-size: 11.5px; font-weight: 700; padding: 4px 12px; border-radius: 20px; cursor: pointer; transition: all 0.2s ease;">Rp 25.000</button>
-                            <button type="button" onclick="setGenAmount(50000)" style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.3); color: var(--accent-cyan); font-size: 11.5px; font-weight: 700; padding: 4px 12px; border-radius: 20px; cursor: pointer; transition: all 0.2s ease;">Rp 50.000</button>
-                            <button type="button" onclick="setGenAmount(100000)" style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.3); color: var(--accent-cyan); font-size: 11.5px; font-weight: 700; padding: 4px 12px; border-radius: 20px; cursor: pointer; transition: all 0.2s ease;">Rp 100.000</button>
-                            <button type="button" onclick="setGenAmount(250000)" style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.3); color: var(--accent-cyan); font-size: 11.5px; font-weight: 700; padding: 4px 12px; border-radius: 20px; cursor: pointer; transition: all 0.2s ease;">Rp 250.000</button>
-                            <button type="button" onclick="setGenAmount(500000)" style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.3); color: var(--accent-cyan); font-size: 11.5px; font-weight: 700; padding: 4px 12px; border-radius: 20px; cursor: pointer; transition: all 0.2s ease;">Rp 500.000</button>
+                        <!-- Action Button -->
+                        <div class="flex justify-end pt-2 border-t border-slate-800/80">
+                            <button class="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-sm rounded-xl shadow-lg shadow-emerald-950/40 transition-all transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2" id="btn-generate-qris" onclick="generateNewQrisOrder()">
+                                <span>✨</span> Generate Kode QRIS Pembayaran Baru
+                            </button>
                         </div>
-
-                        <button class="btn-primary" id="btn-generate-qris" onclick="generateNewQrisOrder()" style="background: linear-gradient(135deg, #10b981, #059669); font-weight: 700; font-size: 14px; padding: 10px 22px; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);">
-                            ✨ Generate Kode QRIS Pembayaran Baru
-                        </button>
                     </div>
 
                     <div class="panel-card">
