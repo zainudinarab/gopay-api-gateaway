@@ -19,9 +19,16 @@ const adminAuth = (req, res) => {
 };
 
 const requestOTP = (req, res) => {
-    const phone = req.body?.phone || req.query?.phone;
+    let phone = (req.body?.phone || req.query?.phone || '').trim();
     if (!phone) {
         return res.status(400).json({ success: false, message: 'Nomor HP wajib diisi' });
+    }
+
+    // Normalisasi format nomor HP (contoh: +628... atau 628... -> 08...)
+    if (phone.startsWith('+62')) {
+        phone = '0' + phone.slice(3);
+    } else if (phone.startsWith('62')) {
+        phone = '0' + phone.slice(2);
     }
 
     if (activeLoginProcess) {
@@ -33,6 +40,11 @@ const requestOTP = (req, res) => {
     const loginScript = path.join(__dirname, '..', 'login.js');
     const proc = spawn(process.execPath, [loginScript, phone], { cwd: path.join(__dirname, '..') });
     activeLoginProcess = proc;
+
+    // Kirim nomor HP via stdin untuk memastikan login.js menerimanya 100%
+    try {
+        proc.stdin.write(phone + '\n');
+    } catch (e) {}
 
     let responseSent = false;
     let outputBuffer = '';
