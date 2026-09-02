@@ -728,7 +728,7 @@ module.exports = {
         }
     },
 
-    async saveMerchantSession(sessionData, key = 'gobiz_primary') {
+    async saveMerchantSession(sessionData, key = 'GOBIZ_MAIN_SESSION') {
         if (!sessionData) return;
         let str;
         if (typeof sessionData === 'string') {
@@ -758,10 +758,13 @@ module.exports = {
         }
     },
 
-    async getMerchantSession(key = 'gobiz_primary') {
+    async getMerchantSession(key = 'GOBIZ_MAIN_SESSION') {
         if (isPostgres) {
             try {
-                const res = await pgPool.query(`SELECT session_data FROM merchant_sessions WHERE session_key = $1`, [key]);
+                let res = await pgPool.query(`SELECT session_data FROM merchant_sessions WHERE session_key = $1`, [key]);
+                if (res.rows.length === 0 || !res.rows[0].session_data) {
+                    res = await pgPool.query(`SELECT session_data FROM merchant_sessions ORDER BY updated_at DESC LIMIT 1`);
+                }
                 if (res.rows.length === 0 || !res.rows[0].session_data) return null;
                 const str = res.rows[0].session_data;
                 try {
@@ -774,7 +777,10 @@ module.exports = {
                 return null;
             }
         }
-        const row = sqliteDb.prepare(`SELECT session_data FROM merchant_sessions WHERE session_key = ?`).get(key);
+        let row = sqliteDb.prepare(`SELECT session_data FROM merchant_sessions WHERE session_key = ?`).get(key);
+        if (!row || !row.session_data) {
+            row = sqliteDb.prepare(`SELECT session_data FROM merchant_sessions ORDER BY updated_at DESC LIMIT 1`).get();
+        }
         if (!row || !row.session_data) return null;
         try {
             return JSON.parse(row.session_data);
