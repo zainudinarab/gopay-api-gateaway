@@ -616,6 +616,7 @@ function renderAdminDashboard(sessionDataOrExists, dbType = 'SQLite WAL', sessio
                         </div>
                         <div class="stat-label">Total Mutasi GoJek</div>
                         <div class="stat-val" id="val-total-tx" style="color: var(--accent-cyan);">Rp 0</div>
+                        <div style="font-size: 12px; color: #94a3b8; margin-top: 4px;" id="val-today-tx">Hari Ini: Rp 0</div>
                     </div>
 
                     <div class="stat-card">
@@ -1539,6 +1540,10 @@ User-Agent: GoPay-Gateway-Webhook-Worker/1.0</pre>
                 const data = await res.json();
                 if (data.success && data.data) {
                     document.getElementById('val-total-tx').innerText = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(data.total_amount || 0);
+                    const elToday = document.getElementById('val-today-tx');
+                    if (elToday) {
+                        elToday.innerText = 'Hari Ini: ' + new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(data.today_amount || 0);
+                    }
                     if (data.data.transactions.length === 0) {
                         tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Belum ada transaksi mutasi GoJek.</td></tr>';
                         return;

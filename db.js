@@ -736,6 +736,73 @@ module.exports = {
         }
     },
 
+    async getAllClaimedTransactions(limit = 100) {
+        if (isPostgres) {
+            try {
+                const res = await pgPool.query(`SELECT * FROM claimed_transactions ORDER BY claimed_at DESC LIMIT $1`, [limit]);
+                return res.rows.map(r => ({
+                    transaction_id: r.transaction_id,
+                    order_id: r.order_id,
+                    qris_id: r.qris_id,
+                    amount: parseInt(r.amount, 10),
+                    payer_issuer: r.payer_issuer,
+                    payment_type: r.payment_type,
+                    transaction_time: r.transaction_time,
+                    claimed_at: parseInt(r.claimed_at, 10)
+                }));
+            } catch (e) {
+                console.error('[PG GET ALL CLAIMED TX ERROR]:', e.message);
+                return [];
+            }
+        }
+        try {
+            const rows = sqliteDb.prepare(`SELECT * FROM claimed_transactions ORDER BY claimed_at DESC LIMIT ?`).all(limit);
+            return rows.map(r => ({
+                transaction_id: r.transaction_id,
+                order_id: r.order_id,
+                qris_id: r.qris_id,
+                amount: r.amount,
+                payer_issuer: r.payer_issuer,
+                payment_type: r.payment_type,
+                transaction_time: r.transaction_time,
+                claimed_at: r.claimed_at
+            }));
+        } catch (e) {
+            return [];
+        }
+    },
+
+    async getClaimedTransactionStats() {
+        const startOfDayMs = new Date().setHours(0, 0, 0, 0);
+        if (isPostgres) {
+            try {
+                const resAll = await pgPool.query(`SELECT COALESCE(SUM(amount), 0) as total_sum, COUNT(*) as total_count FROM claimed_transactions`);
+                const resToday = await pgPool.query(`SELECT COALESCE(SUM(amount), 0) as today_sum, COUNT(*) as today_count FROM claimed_transactions WHERE claimed_at >= $1`, [startOfDayMs]);
+                return {
+                    totalAmount: parseInt(resAll.rows[0].total_sum || '0', 10),
+                    totalCount: parseInt(resAll.rows[0].total_count || '0', 10),
+                    todayAmount: parseInt(resToday.rows[0].today_sum || '0', 10),
+                    todayCount: parseInt(resToday.rows[0].today_count || '0', 10)
+                };
+            } catch (e) {
+                console.error('[PG GET STATS ERROR]:', e.message);
+                return { totalAmount: 0, totalCount: 0, todayAmount: 0, todayCount: 0 };
+            }
+        }
+        try {
+            const rowAll = sqliteDb.prepare(`SELECT COALESCE(SUM(amount), 0) as total_sum, COUNT(*) as total_count FROM claimed_transactions`).get();
+            const rowToday = sqliteDb.prepare(`SELECT COALESCE(SUM(amount), 0) as today_sum, COUNT(*) as today_count FROM claimed_transactions WHERE claimed_at >= ?`).get(startOfDayMs);
+            return {
+                totalAmount: parseInt(rowAll.total_sum || 0, 10),
+                totalCount: parseInt(rowAll.total_count || 0, 10),
+                todayAmount: parseInt(rowToday.today_sum || 0, 10),
+                todayCount: parseInt(rowToday.today_count || 0, 10)
+            };
+        } catch (e) {
+            return { totalAmount: 0, totalCount: 0, todayAmount: 0, todayCount: 0 };
+        }
+    },
+
     async saveMerchantSession(sessionData, key = 'GOBIZ_MAIN_SESSION') {
         if (!sessionData) return;
         let str;
