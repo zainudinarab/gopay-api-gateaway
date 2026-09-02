@@ -12,20 +12,20 @@ const { renderAdminDashboard } = require('../views/adminDashboard');
 
 // Halaman Admin Portal Dashboard (/login)
 router.get('/login', async (req, res) => {
-    let sessionFileExists = false;
-    const sessionPath = path.join(__dirname, '..', '.GOPAY_SESI_JANGAN_DIHAPUS.json');
-    try {
-        if (fs.existsSync(sessionPath) && fs.statSync(sessionPath).isFile()) {
-            const content = fs.readFileSync(sessionPath, 'utf8');
-            if (content && content.trim().startsWith('{')) {
-                sessionFileExists = true;
+    let merchantSession = await db.getMerchantSession();
+    if (!merchantSession) {
+        const sessionPath = path.join(__dirname, '..', '.GOPAY_SESI_JANGAN_DIHAPUS.json');
+        try {
+            if (fs.existsSync(sessionPath) && fs.statSync(sessionPath).isFile()) {
+                const content = fs.readFileSync(sessionPath, 'utf8');
+                if (content && content.trim().startsWith('{')) {
+                    merchantSession = JSON.parse(content);
+                }
             }
-        }
-    } catch (e) {}
+        } catch (e) {}
+    }
 
-    const dbSessionExists = Boolean(await db.getMerchantSession());
-    const sessionExists = sessionFileExists || dbSessionExists;
-    const html = renderAdminDashboard(sessionExists, db.dbType);
+    const html = renderAdminDashboard(merchantSession, db.dbType);
     res.setHeader('Content-Type', 'text/html');
     res.send(html);
 });
