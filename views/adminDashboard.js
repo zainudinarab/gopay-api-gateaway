@@ -22,6 +22,7 @@ function renderAdminDashboard(sessionDataOrExists, dbType = 'SQLite WAL', sessio
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <style>
         :root {
             --bg-body: #0b0f19;
@@ -1642,49 +1643,48 @@ User-Agent: GoPay-Gateway-Webhook-Worker/1.0</pre>
             const file = evt.target.files[0];
             if (!file) return;
 
-            showAlert('info', 'Memindai & mendeteksi Kode QRIS dari gambar...');
+            showAlert('info', 'Membaca & memindai QR code dari gambar di browser...');
             const reader = new FileReader();
             reader.onload = (e) => {
                 const img = new Image();
                 img.onload = async () => {
                     const canvas = document.createElement('canvas');
-                    let width = img.width;
-                    let height = img.height;
-                    const maxDim = 1200;
-                    if (width > maxDim || height > maxDim) {
-                        if (width > height) {
-                            height = Math.round((height * maxDim) / width);
-                            width = maxDim;
-                        } else {
-                            width = Math.round((width * maxDim) / height);
-                            height = maxDim;
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, img.width, img.height);
+                    const imageData = ctx.getImageData(0, 0, img.width, img.height);
+
+                    let qrisText = '';
+                    if (typeof jsQR !== 'undefined') {
+                        const code = jsQR(imageData.data, imageData.width, imageData.height);
+                        if (code && code.data) {
+                            qrisText = code.data.trim();
                         }
                     }
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-                    const resizedBase64 = canvas.toDataURL('image/jpeg', 0.85);
 
-                    try {
-                        const res = await fetch('/api/settings/upload-qris', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'x-admin-password': adminPass
-                            },
-                            body: JSON.stringify({ image: resizedBase64, admin_password: adminPass })
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                            showAlert('success', data.message);
-                            const el = document.getElementById('inp-static-qris');
-                            if (el) el.value = data.qris_string;
-                        } else {
-                            showAlert('error', data.message || 'Gagal memindai QR code dari gambar');
-                        }
-                    } catch (err) {
-                        showAlert('error', 'Error: ' + err.message);
+                    // Fallback to server decode if client jsQR didn't find barcode
+                    if (!qrisText) {
+                        try {
+                            const res = await fetch('/api/settings/upload-qris', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPass },
+                                body: JSON.stringify({ image: canvas.toDataURL('image/jpeg', 0.8), admin_password: adminPass })
+                            });
+                            const data = await res.json();
+                            if (data.success && data.qris_string) {
+                                qrisText = data.qris_string;
+                            }
+                        } catch (err) {}
+                    }
+
+                    if (qrisText) {
+                        const el = document.getElementById('inp-static-qris');
+                        if (el) el.value = qrisText;
+                        showAlert('success', 'QR Code berhasil dibaca! Menyimpan string teks ke Database PostgreSQL...');
+                        await saveStaticQrisConfig();
+                    } else {
+                        showAlert('error', 'Gagal membaca QR Code dari gambar. Pastikan gambar jelas & tidak buram.');
                     }
                 };
                 img.src = e.target.result;
