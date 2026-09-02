@@ -1644,28 +1644,50 @@ User-Agent: GoPay-Gateway-Webhook-Worker/1.0</pre>
 
             showAlert('info', 'Memindai & mendeteksi Kode QRIS dari gambar...');
             const reader = new FileReader();
-            reader.onload = async (e) => {
-                const base64Image = e.target.result;
-                try {
-                    const res = await fetch('/api/settings/upload-qris', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'x-admin-password': adminPass
-                        },
-                        body: JSON.stringify({ image: base64Image, admin_password: adminPass })
-                    });
-                    const data = await res.json();
-                    if (data.success) {
-                        showAlert('success', data.message);
-                        const el = document.getElementById('inp-static-qris');
-                        if (el) el.value = data.qris_string;
-                    } else {
-                        showAlert('error', data.message || 'Gagal memindai QR code dari gambar');
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = async () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+                    const maxDim = 1200;
+                    if (width > maxDim || height > maxDim) {
+                        if (width > height) {
+                            height = Math.round((height * maxDim) / width);
+                            width = maxDim;
+                        } else {
+                            width = Math.round((width * maxDim) / height);
+                            height = maxDim;
+                        }
                     }
-                } catch (err) {
-                    showAlert('error', 'Error: ' + err.message);
-                }
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    const resizedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+
+                    try {
+                        const res = await fetch('/api/settings/upload-qris', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'x-admin-password': adminPass
+                            },
+                            body: JSON.stringify({ image: resizedBase64, admin_password: adminPass })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            showAlert('success', data.message);
+                            const el = document.getElementById('inp-static-qris');
+                            if (el) el.value = data.qris_string;
+                        } else {
+                            showAlert('error', data.message || 'Gagal memindai QR code dari gambar');
+                        }
+                    } catch (err) {
+                        showAlert('error', 'Error: ' + err.message);
+                    }
+                };
+                img.src = e.target.result;
             };
             reader.readAsDataURL(file);
         }
