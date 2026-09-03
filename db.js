@@ -140,15 +140,15 @@ if (isPostgres) {
                             ('TokoOnline', $3, 'Website Toko Online Utama', TRUE, $4, $4)
                         ON CONFLICT (app_id) DO NOTHING
                     `, [adminPass, defaultSecret, 'arabsecret999', now]);
-                } catch (e) {}
 
-                if (process.env.GOPAY_STATIC_QRIS && process.env.GOPAY_STATIC_QRIS.trim()) {
+                    // Default Merchant Seeder
+                    const defaultQris = (process.env.GOPAY_STATIC_QRIS || '00020101021126610014COM.GO-JEK.WWW011893600914008447283035204581253033605802ID5916TOKO UTAMA GOPAY6007JAKARTA61051234562070703A0163041B2C').trim();
                     await client.query(`
-                        INSERT INTO merchants (merchant_id, merchant_name, merchant_type, static_qris, created_at, updated_at)
-                        VALUES ('G844728303', 'Merchant GoPay', 'gopay', $1, $2, $2)
+                        INSERT INTO merchants (merchant_id, merchant_name, phone_number, merchant_type, city, static_qris, is_active, created_at, updated_at)
+                        VALUES ('G844728303', 'Toko Utama GoPay', '081234567890', 'gopay', 'Jakarta', $1, TRUE, $2, $2)
                         ON CONFLICT (merchant_id) DO NOTHING
-                    `, [process.env.GOPAY_STATIC_QRIS.trim(), Date.now()]);
-                }
+                    `, [defaultQris, now]);
+                } catch (e) {}
                 client.release();
                 console.log(`[DATABASE] Connected & Schema Initialized on PostgreSQL (${targetDbName})!`);
                 return;
@@ -251,6 +251,13 @@ if (isPostgres) {
                 ('App1', ?, 'Default Client App1', 1, ?, ?),
                 ('TokoOnline', ?, 'Website Toko Online Utama', 1, ?, ?)
         `).run(adminPass, now, now, defaultSecret, now, now, 'arabsecret999', now, now);
+
+        // Default Merchant Seeder
+        const defaultQris = (process.env.GOPAY_STATIC_QRIS || '00020101021126610014COM.GO-JEK.WWW011893600914008447283035204581253033605802ID5916TOKO UTAMA GOPAY6007JAKARTA61051234562070703A0163041B2C').trim();
+        sqliteDb.prepare(`
+            INSERT OR IGNORE INTO merchants (merchant_id, merchant_name, phone_number, merchant_type, city, static_qris, is_active, created_at, updated_at)
+            VALUES ('G844728303', 'Toko Utama GoPay', '081234567890', 'gopay', 'Jakarta', ?, 1, ?, ?)
+        `).run(defaultQris, now, now);
     } catch (e) {}
 }
 
