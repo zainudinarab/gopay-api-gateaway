@@ -141,13 +141,29 @@ if (isPostgres) {
                         ON CONFLICT (app_id) DO NOTHING
                     `, [adminPass, defaultSecret, 'arabsecret999', now]);
 
-                    // Default Merchant Seeder
-                    const defaultQris = (process.env.GOPAY_STATIC_QRIS || '00020101021126610014COM.GO-JEK.WWW011893600914008447283035204581253033605802ID5916TOKO UTAMA GOPAY6007JAKARTA61051234562070703A0163041B2C').trim();
+                    // Default Merchant Seeder (imports .GOPAY_SESI_JANGAN_DIHAPUS.json if present)
+                    let savedSession = null;
+                    try {
+                        const fileContent = fs.readFileSync(path.join(__dirname, '.GOPAY_SESI_JANGAN_DIHAPUS.json'), 'utf8');
+                        if (fileContent) savedSession = JSON.parse(fileContent);
+                    } catch (e) {}
+
+                    const mId = (savedSession && savedSession.merchant_id) || 'G844728303';
+                    const mName = (savedSession && savedSession.outlet_name) || 'arabpay, Digital & Kreatif';
+                    const mPhone = (savedSession && savedSession.phone_number) || '081240060690';
+                    const mSessStr = savedSession ? JSON.stringify(savedSession) : null;
+                    const defaultQris = (process.env.GOPAY_STATIC_QRIS || '00020101021126610014COM.GO-JEK.WWW011893600914008447283035204581253033605802ID5926ARABPAY DIGITAL DAN KREATIF6007JAKARTA61051234562070703A0163041B2C').trim();
+
                     await client.query(`
-                        INSERT INTO merchants (merchant_id, merchant_name, phone_number, merchant_type, city, static_qris, is_active, created_at, updated_at)
-                        VALUES ('G844728303', 'Toko Utama GoPay', '081234567890', 'gopay', 'Jakarta', $1, TRUE, $2, $2)
-                        ON CONFLICT (merchant_id) DO NOTHING
-                    `, [defaultQris, now]);
+                        INSERT INTO merchants (merchant_id, merchant_name, phone_number, merchant_type, city, static_qris, session_data, is_active, created_at, updated_at)
+                        VALUES ($1, $2, $3, 'gopay', 'Jakarta', $4, $5, TRUE, $6, $6)
+                        ON CONFLICT (merchant_id) DO UPDATE SET
+                            merchant_name = EXCLUDED.merchant_name,
+                            phone_number = EXCLUDED.phone_number,
+                            session_data = COALESCE(EXCLUDED.session_data, merchants.session_data),
+                            is_active = TRUE,
+                            updated_at = EXCLUDED.updated_at
+                    `, [mId, mName, mPhone, defaultQris, mSessStr, now]);
                 } catch (e) {}
                 client.release();
                 console.log(`[DATABASE] Connected & Schema Initialized on PostgreSQL (${targetDbName})!`);
@@ -252,12 +268,29 @@ if (isPostgres) {
                 ('TokoOnline', ?, 'Website Toko Online Utama', 1, ?, ?)
         `).run(adminPass, now, now, defaultSecret, now, now, 'arabsecret999', now, now);
 
-        // Default Merchant Seeder
-        const defaultQris = (process.env.GOPAY_STATIC_QRIS || '00020101021126610014COM.GO-JEK.WWW011893600914008447283035204581253033605802ID5916TOKO UTAMA GOPAY6007JAKARTA61051234562070703A0163041B2C').trim();
+        // Default Merchant Seeder (imports .GOPAY_SESI_JANGAN_DIHAPUS.json if present)
+        let savedSessionSqlite = null;
+        try {
+            const fileContent = fs.readFileSync(path.join(__dirname, '.GOPAY_SESI_JANGAN_DIHAPUS.json'), 'utf8');
+            if (fileContent) savedSessionSqlite = JSON.parse(fileContent);
+        } catch (e) {}
+
+        const mId = (savedSessionSqlite && savedSessionSqlite.merchant_id) || 'G844728303';
+        const mName = (savedSessionSqlite && savedSessionSqlite.outlet_name) || 'arabpay, Digital & Kreatif';
+        const mPhone = (savedSessionSqlite && savedSessionSqlite.phone_number) || '081240060690';
+        const mSessStr = savedSessionSqlite ? JSON.stringify(savedSessionSqlite) : null;
+        const defaultQris = (process.env.GOPAY_STATIC_QRIS || '00020101021126610014COM.GO-JEK.WWW011893600914008447283035204581253033605802ID5926ARABPAY DIGITAL DAN KREATIF6007JAKARTA61051234562070703A0163041B2C').trim();
+
         sqliteDb.prepare(`
-            INSERT OR IGNORE INTO merchants (merchant_id, merchant_name, phone_number, merchant_type, city, static_qris, is_active, created_at, updated_at)
-            VALUES ('G844728303', 'Toko Utama GoPay', '081234567890', 'gopay', 'Jakarta', ?, 1, ?, ?)
-        `).run(defaultQris, now, now);
+            INSERT INTO merchants (merchant_id, merchant_name, phone_number, merchant_type, city, static_qris, session_data, is_active, created_at, updated_at)
+            VALUES (?, ?, ?, 'gopay', 'Jakarta', ?, ?, 1, ?, ?)
+            ON CONFLICT(merchant_id) DO UPDATE SET
+                merchant_name = excluded.merchant_name,
+                phone_number = excluded.phone_number,
+                session_data = COALESCE(excluded.session_data, merchants.session_data),
+                is_active = 1,
+                updated_at = excluded.updated_at
+        `).run(mId, mName, mPhone, defaultQris, mSessStr, now, now);
     } catch (e) {}
 }
 
