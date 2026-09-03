@@ -1,4 +1,4 @@
-FROM node:22-alpine
+FROM node:20-alpine
 
 WORKDIR /app
 
@@ -10,7 +10,9 @@ ENV PYTHON=/usr/bin/python3
 
 COPY package*.json ./
 
-RUN npm install --omit=dev
+# Set disturl ke Official Node.js CDN agar node-gyp tidak ETIMEDOUT saat mengambil header
+RUN npm config set disturl https://nodejs.org/dist && \
+    npm install --omit=dev
 
 COPY . .
 
