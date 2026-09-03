@@ -1,6 +1,9 @@
-FROM node:22
+FROM node:22-alpine
 
 WORKDIR /app
+
+# Install build dependencies yang dibutuhkan node-gyp & better-sqlite3
+RUN apk add --no-cache python3 make g++
 
 COPY package*.json ./
 
