@@ -26,6 +26,9 @@ if (isPostgres) {
     };
 
     pgPool = new Pool(pgConfig);
+    pgPool.on('error', (err) => {
+        console.warn('[POSTGRES POOL WARNING]: Connection error on idle client:', err.message);
+    });
 
     // Initialize PostgreSQL Tables with auto-create database and retry logic
     const initPgSchema = async (retries = 10, delay = 2000) => {
@@ -112,11 +115,7 @@ if (isPostgres) {
                         updated_at BIGINT NOT NULL
                     );
 
-                    CREATE TABLE IF NOT EXISTS app_settings (
-                        setting_key VARCHAR(100) PRIMARY KEY,
-                        setting_value TEXT NOT NULL,
-                        updated_at BIGINT NOT NULL
-                    );
+                    DROP TABLE IF EXISTS app_settings;
 
                     CREATE TABLE IF NOT EXISTS api_clients (
                         app_id VARCHAR(100) PRIMARY KEY,
@@ -130,15 +129,8 @@ if (isPostgres) {
 
                 try {
                     const defaultSecret = (process.env.APP_SECRET || 'secret123').trim();
-                    const defaultAllowed = (process.env.ALLOWED_APP_IDS || process.env.APP_IDS || 'App1,App2,admin').trim();
                     const adminPass = (process.env.ADMIN_PASSWORD || 'admin123456').trim();
                     const now = Date.now();
-
-                    await client.query(`
-                        INSERT INTO app_settings (setting_key, setting_value, updated_at)
-                        VALUES ('app_secret', $1, $3), ('allowed_app_ids', $2, $3)
-                        ON CONFLICT (setting_key) DO NOTHING
-                    `, [defaultSecret, defaultAllowed, now]);
 
                     await client.query(`
                         INSERT INTO api_clients (app_id, app_secret, client_name, is_active, created_at, updated_at)
@@ -280,11 +272,7 @@ if (isPostgres) {
             updated_at INTEGER NOT NULL
         );
 
-        CREATE TABLE IF NOT EXISTS app_settings (
-            setting_key TEXT PRIMARY KEY,
-            setting_value TEXT NOT NULL,
-            updated_at INTEGER NOT NULL
-        );
+        DROP TABLE IF EXISTS app_settings;
 
         CREATE TABLE IF NOT EXISTS api_clients (
             app_id TEXT PRIMARY KEY,
@@ -298,13 +286,8 @@ if (isPostgres) {
 
     try {
         const defaultSecret = (process.env.APP_SECRET || 'secret123').trim();
-        const defaultAllowed = (process.env.ALLOWED_APP_IDS || process.env.APP_IDS || 'App1,App2,admin').trim();
         const adminPass = (process.env.ADMIN_PASSWORD || 'admin123456').trim();
         const now = Date.now();
-        sqliteDb.prepare(`
-            INSERT OR IGNORE INTO app_settings (setting_key, setting_value, updated_at)
-            VALUES ('app_secret', ?, ?), ('allowed_app_ids', ?, ?)
-        `).run(defaultSecret, now, defaultAllowed, now);
 
         sqliteDb.prepare(`
             INSERT OR IGNORE INTO api_clients (app_id, app_secret, client_name, is_active, created_at, updated_at)
@@ -1405,86 +1388,6 @@ module.exports = {
 
         const success = await this.saveMerchant(updateData);
         return { success, message: success ? `Data Merchant ${mId} berhasil diperbarui` : 'Gagal mengupdate merchant' };
-    },
-
-    async getAppSetting(key, defaultValue = '') {
-        if (!key) return defaultValue;
-        const cleanKey = String(key).trim();
-        if (isPostgres) {
-            try {
-                const res = await pgPool.query(`SELECT setting_value FROM app_settings WHERE setting_key = $1`, [cleanKey]);
-                if (res.rows.length > 0) return res.rows[0].setting_value;
-            } catch (e) {}
-        } else {
-            try {
-                const row = sqliteDb.prepare(`SELECT setting_value FROM app_settings WHERE setting_key = ?`).get(cleanKey);
-                if (row) return row.setting_value;
-            } catch (e) {}
-        }
-        return defaultValue;
-    },
-
-    async setAppSetting(key, value) {
-        if (!key) return false;
-        const cleanKey = String(key).trim();
-        const cleanVal = String(value || '').trim();
-        const now = Date.now();
-
-        if (isPostgres) {
-            try {
-                await pgPool.query(`
-                    INSERT INTO app_settings (setting_key, setting_value, updated_at)
-                    VALUES ($1, $2, $3)
-                    ON CONFLICT (setting_key) DO UPDATE SET
-                        setting_value = EXCLUDED.setting_value,
-                        updated_at = EXCLUDED.updated_at
-                `, [cleanKey, cleanVal, now]);
-                return true;
-            } catch (e) {
-                console.error('[PG SET APP SETTING ERROR]:', e.message);
-            }
-        } else {
-            try {
-                sqliteDb.prepare(`
-                    INSERT INTO app_settings (setting_key, setting_value, updated_at)
-                    VALUES (?, ?, ?)
-                    ON CONFLICT(setting_key) DO UPDATE SET
-                        setting_value = excluded.setting_value,
-                        updated_at = excluded.updated_at
-                `).run(cleanKey, cleanVal, now);
-                return true;
-            } catch (e) {}
-        }
-        return false;
-    },
-
-    async getAppSecret() {
-        const val = await this.getAppSetting('app_secret');
-        if (val && val.trim()) return val.trim();
-        return (process.env.APP_SECRET || 'secret123').trim();
-    },
-
-    async setAppSecret(secret) {
-        return await this.setAppSetting('app_secret', secret);
-    },
-
-    async getAllowedAppIds() {
-        const val = await this.getAppSetting('allowed_app_ids');
-        let raw = val;
-        if (!raw || !raw.trim()) {
-            raw = process.env.ALLOWED_APP_IDS || process.env.APP_IDS || 'App1,App2,admin';
-        }
-        return raw.split(',').map(s => s.trim()).filter(Boolean);
-    },
-
-    async setAllowedAppIds(appIds) {
-        let valStr = '';
-        if (Array.isArray(appIds)) {
-            valStr = appIds.map(s => String(s).trim()).filter(Boolean).join(',');
-        } else {
-            valStr = String(appIds || '').trim();
-        }
-        return await this.setAppSetting('allowed_app_ids', valStr);
     },
 
     async getAllApiClients() {

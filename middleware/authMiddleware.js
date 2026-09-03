@@ -26,17 +26,10 @@ const apiKeyAuth = async (req, res, next) => {
     const isValidPair = await db.verifyApiClient(cleanAppId, cleanSecret);
 
     if (!isValidPair && !isAdmin) {
-        // Fallback check against global app_secret
-        const globalSecret = await db.getAppSecret();
-        const allowedAppIds = await db.getAllowedAppIds();
-        const isLegacyMatch = (cleanSecret === globalSecret) && (allowedAppIds.length === 0 || allowedAppIds.includes(cleanAppId));
-
-        if (!isLegacyMatch) {
-            return res.status(401).json({ 
-                success: false, 
-                message: `Autentikasi Gagal: Pasangan app_id '${cleanAppId}' dan app_secret tidak cocok atau akun API non-aktif di database.` 
-            });
-        }
+        return res.status(401).json({ 
+            success: false, 
+            message: `Autentikasi Gagal: Pasangan app_id '${cleanAppId}' dan app_secret tidak cocok atau akun API non-aktif di database.` 
+        });
     }
 
     req.appId = cleanAppId;

@@ -57,38 +57,6 @@ router.post('/merchants/active', adminPassAuth, async (req, res) => {
     res.json({ success: true, message: `Merchant aktif diubah ke ${merchantId}` });
 });
 
-router.get('/settings/credentials', adminPassAuth, async (req, res) => {
-    const db = require('../db');
-    const appSecret = await db.getAppSecret();
-    const allowedAppIds = await db.getAllowedAppIds();
-    res.json({
-        success: true,
-        app_secret: appSecret,
-        allowed_app_ids: allowedAppIds,
-        allowed_app_ids_str: allowedAppIds.join(', ')
-    });
-});
-
-router.post('/settings/credentials', adminPassAuth, async (req, res) => {
-    const db = require('../db');
-    const appSecret = req.body?.app_secret;
-    const allowedAppIds = req.body?.allowed_app_ids;
-
-    if (appSecret !== undefined && String(appSecret).trim()) {
-        await db.setAppSecret(String(appSecret).trim());
-    }
-    if (allowedAppIds !== undefined) {
-        await db.setAllowedAppIds(allowedAppIds);
-    }
-    logActivity('INFO', '[APP SETTINGS] Kredensial API (APP_SECRET & ALLOWED_APP_IDS) di-update di database');
-    res.json({
-        success: true,
-        message: 'Kredensial API (APP_SECRET & ALLOWED_APP_IDS) berhasil diperbarui di database!',
-        app_secret: await db.getAppSecret(),
-        allowed_app_ids: await db.getAllowedAppIds()
-    });
-});
-
 router.get('/clients', adminPassAuth, async (req, res) => {
     const db = require('../db');
     const clients = await db.getAllApiClients();

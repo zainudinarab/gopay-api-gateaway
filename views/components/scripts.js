@@ -844,7 +844,6 @@ function renderScripts() {
                 container.innerHTML = html;
 
                 await populateMerchantOrderDropdown(settings);
-                await loadAppCredentialsSetting();
                 await loadApiClientsList();
             } catch (e) {
                 container.innerHTML = '<div style="color:var(--accent-red); font-size:13px;">Gagal memuat merchant: ' + e.message + '</div>';
@@ -1056,47 +1055,6 @@ function renderScripts() {
             if (secretInp && secretInp.value) {
                 navigator.clipboard.writeText(secretInp.value);
                 showAlert('success', '📋 App-Secret berhasil disalin ke clipboard!');
-            }
-        }
-
-        async function loadAppCredentialsSetting() {
-            try {
-                const res = await fetch('/api/settings/credentials', { headers: { 'x-admin-password': adminPass } }).then(r => r.json());
-                if (res.success) {
-                    const secretInp = document.getElementById('inp-setting-app-secret');
-                    const allowedInp = document.getElementById('inp-setting-allowed-app-ids');
-                    if (secretInp && res.app_secret) secretInp.value = res.app_secret;
-                    if (allowedInp && res.allowed_app_ids_str) allowedInp.value = res.allowed_app_ids_str;
-                }
-            } catch (e) {}
-        }
-
-        async function saveAppCredentialsSetting() {
-            const secretInp = document.getElementById('inp-setting-app-secret');
-            const allowedInp = document.getElementById('inp-setting-allowed-app-ids');
-            const secret = secretInp?.value?.trim();
-            const allowed = allowedInp?.value?.trim();
-
-            if (!secret) {
-                showAlert('error', '⚠️ APP_SECRET tidak boleh kosong.');
-                return;
-            }
-
-            try {
-                const res = await fetch('/api/settings/credentials', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPass },
-                    body: JSON.stringify({ app_secret: secret, allowed_app_ids: allowed, admin_password: adminPass })
-                }).then(r => r.json());
-
-                if (res.success) {
-                    showAlert('success', '✨ Kredensial API (APP_SECRET & ALLOWED_APP_IDS) berhasil tersimpan di database!');
-                    await loadAppCredentialsSetting();
-                } else {
-                    showAlert('error', res.message || 'Gagal menyimpan kredensial API');
-                }
-            } catch (e) {
-                showAlert('error', 'Error: ' + e.message);
             }
         }
 
