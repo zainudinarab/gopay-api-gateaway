@@ -152,7 +152,7 @@ if (isPostgres) {
                     const mName = (savedSession && savedSession.outlet_name) || 'arabpay, Digital & Kreatif';
                     const mPhone = (savedSession && savedSession.phone_number) || '081240060690';
                     const mSessStr = savedSession ? JSON.stringify(savedSession) : null;
-                    const defaultQris = (process.env.GOPAY_STATIC_QRIS || '00020101021126610014COM.GO-JEK.WWW011893600914008447283035204581253033605802ID5926ARABPAY DIGITAL DAN KREATIF6007JAKARTA61051234562070703A0163041B2C').trim();
+                    const defaultQris = (process.env.GOPAY_STATIC_QRIS || '00020101021126410014COM.GO-JEK.WWW011993600914008447283035204581253033605802ID5927ARABPAY DIGITAL DAN KREATIF6007JAKARTA61051234562070703A0163049C45').trim();
 
                     await client.query(`
                         INSERT INTO merchants (merchant_id, merchant_name, phone_number, merchant_type, city, static_qris, session_data, is_active, created_at, updated_at)
@@ -279,7 +279,7 @@ if (isPostgres) {
         const mName = (savedSessionSqlite && savedSessionSqlite.outlet_name) || 'arabpay, Digital & Kreatif';
         const mPhone = (savedSessionSqlite && savedSessionSqlite.phone_number) || '081240060690';
         const mSessStr = savedSessionSqlite ? JSON.stringify(savedSessionSqlite) : null;
-        const defaultQris = (process.env.GOPAY_STATIC_QRIS || '00020101021126610014COM.GO-JEK.WWW011893600914008447283035204581253033605802ID5926ARABPAY DIGITAL DAN KREATIF6007JAKARTA61051234562070703A0163041B2C').trim();
+        const defaultQris = (process.env.GOPAY_STATIC_QRIS || '00020101021126410014COM.GO-JEK.WWW011993600914008447283035204581253033605802ID5927ARABPAY DIGITAL DAN KREATIF6007JAKARTA61051234562070703A0163049C45').trim();
 
         sqliteDb.prepare(`
             INSERT INTO merchants (merchant_id, merchant_name, phone_number, merchant_type, city, static_qris, session_data, is_active, created_at, updated_at)

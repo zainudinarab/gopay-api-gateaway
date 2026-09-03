@@ -16,22 +16,36 @@ function calcCRC16(str) {
 }
 
 function convertStaticToDynamicQRIS(staticQR, amount) {
+    if (!staticQR || typeof staticQR !== 'string') return '';
     let base = staticQR.trim();
-    if (base.endsWith('6304') || /6304[0-9A-Fa-f]{4}$/.test(base)) {
-        base = base.replace(/6304[0-9A-Fa-f]{4}$/, '');
+
+    // Hapus CRC lama di akhir jika ada
+    if (base.endsWith('6304') || /6304[0-9A-Fa-f]{4}$/i.test(base)) {
+        base = base.replace(/6304[0-9A-Fa-f]{4}$/i, '');
     }
 
+    // Ubah Tag 01 dari Static (010211) menjadi Dynamic (010212)
     base = base.replace(/010211/, '010212');
 
-    const amtStr = String(amount);
+    // Hapus Tag 54 lama jika pernah terpasang
+    base = base.replace(/54\d{2}\d+/, '');
+
+    const amtStr = String(Math.floor(amount));
     const amtLengthStr = String(amtStr.length).padStart(2, '0');
     const tag54 = `54${amtLengthStr}${amtStr}`;
 
-    const tag58Pos = base.indexOf('5802ID');
-    if (tag58Pos !== -1) {
-        base = base.slice(0, tag58Pos) + tag54 + base.slice(tag58Pos);
+    // Sisipkan Tag 54 tepat setelah Tag 53 (5303360 = IDR)
+    const tag53Pos = base.indexOf('5303360');
+    if (tag53Pos !== -1) {
+        const insertPos = tag53Pos + '5303360'.length;
+        base = base.slice(0, insertPos) + tag54 + base.slice(insertPos);
     } else {
-        base += tag54;
+        const tag58Pos = base.indexOf('5802ID');
+        if (tag58Pos !== -1) {
+            base = base.slice(0, tag58Pos) + tag54 + base.slice(tag58Pos);
+        } else {
+            base += tag54;
+        }
     }
 
     const payloadForCRC = base + '6304';

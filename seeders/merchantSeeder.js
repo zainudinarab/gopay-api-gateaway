@@ -23,7 +23,7 @@ const initialMerchants = [
         phone_number: (savedSession && savedSession.phone_number) || '081240060690',
         merchant_type: 'gopay',
         city: 'Jakarta',
-        static_qris: (process.env.GOPAY_STATIC_QRIS || '00020101021126610014COM.GO-JEK.WWW011893600914008447283035204581253033605802ID5926ARABPAY DIGITAL DAN KREATIF6007JAKARTA61051234562070703A0163041B2C').trim(),
+        static_qris: (process.env.GOPAY_STATIC_QRIS || '00020101021126410014COM.GO-JEK.WWW011993600914008447283035204581253033605802ID5927ARABPAY DIGITAL DAN KREATIF6007JAKARTA61051234562070703A0163049C45').trim(),
         session_data: sessionJsonStr,
         is_active: true
     },
