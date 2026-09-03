@@ -142,51 +142,6 @@ if (isPostgres) {
                     `, [adminPass, defaultSecret, 'arabsecret999', now]);
                 } catch (e) {}
 
-                try { await client.query("ALTER TABLE qris_orders ADD COLUMN merchant_id VARCHAR(100);"); } catch (e) {}
-                try { await client.query("ALTER TABLE claimed_transactions ADD COLUMN merchant_id VARCHAR(100);"); } catch (e) {}
-
-                // Auto-Migration: Migrasikan data dari merchant_settings & merchant_sessions ke tabel merchants jika ada
-                try {
-                    await client.query(`
-                        INSERT INTO merchants (merchant_id, merchant_name, merchant_type, city, static_qris, created_at, updated_at)
-                        SELECT merchant_id, merchant_name, merchant_type, city, static_qris, updated_at, updated_at
-                        FROM merchant_settings
-                        ON CONFLICT (merchant_id) DO UPDATE SET
-                            merchant_name = COALESCE(EXCLUDED.merchant_name, merchants.merchant_name),
-                            merchant_type = COALESCE(EXCLUDED.merchant_type, merchants.merchant_type),
-                            city = COALESCE(EXCLUDED.city, merchants.city),
-                            static_qris = COALESCE(EXCLUDED.static_qris, merchants.static_qris)
-                    `);
-                    
-                    const sessRes = await client.query(`SELECT session_key, merchant_id, session_data, updated_at FROM merchant_sessions`);
-                    for (const s of sessRes.rows) {
-                        let parsed = null;
-                        try { parsed = JSON.parse(s.session_data); } catch (e) {}
-                        if (parsed && typeof parsed === 'object') {
-                            const mId = parsed.merchant_id || parsed.merchantId || s.merchant_id || s.session_key;
-                            const phone = parsed.phone_number || parsed.phoneNumber || parsed.phone || null;
-                            if (mId && mId !== 'GOBIZ_MAIN_SESSION' && mId !== 'gobiz_primary') {
-                                await client.query(`
-                                    INSERT INTO merchants (merchant_id, merchant_name, phone_number, session_data, updated_at, created_at)
-                                    VALUES ($1, $2, $3, $4, $5, $5)
-                                    ON CONFLICT (merchant_id) DO UPDATE SET
-                                        session_data = EXCLUDED.session_data,
-                                        phone_number = COALESCE(EXCLUDED.phone_number, merchants.phone_number),
-                                        updated_at = EXCLUDED.updated_at
-                                `, [mId, parsed.outlet_name || 'Merchant GoPay', phone, s.session_data, parseInt(s.updated_at, 10)]);
-                            }
-                        }
-                    }
-                } catch (e) {
-                    // Silently ignore if old tables don't exist
-                }
-
-                // Hapus tabel lama merchant_sessions dan merchant_settings & bersihkan entry sistem dari tabel merchants
-                try {
-                    await client.query(`DROP TABLE IF EXISTS merchant_sessions CASCADE; DROP TABLE IF EXISTS merchant_settings CASCADE;`);
-                    await client.query(`DELETE FROM merchants WHERE merchant_id IN ('active_merchant_id', 'DEFAULT', 'gopay_static_qris', 'GOBIZ_MAIN_SESSION')`);
-                } catch (e) {}
-
                 if (process.env.GOPAY_STATIC_QRIS && process.env.GOPAY_STATIC_QRIS.trim()) {
                     await client.query(`
                         INSERT INTO merchants (merchant_id, merchant_name, merchant_type, static_qris, created_at, updated_at)
@@ -297,51 +252,6 @@ if (isPostgres) {
                 ('TokoOnline', ?, 'Website Toko Online Utama', 1, ?, ?)
         `).run(adminPass, now, now, defaultSecret, now, now, 'arabsecret999', now, now);
     } catch (e) {}
-
-    try { sqliteDb.exec("ALTER TABLE qris_orders ADD COLUMN merchant_id TEXT;"); } catch (e) {}
-    try { sqliteDb.exec("ALTER TABLE claimed_transactions ADD COLUMN merchant_id TEXT;"); } catch (e) {}
-    try { sqliteDb.exec("ALTER TABLE qris_orders ADD COLUMN base_amount INTEGER;"); } catch (e) {}
-    try { sqliteDb.exec("ALTER TABLE qris_orders ADD COLUMN unique_code INTEGER DEFAULT 0;"); } catch (e) {}
-    try { sqliteDb.exec("ALTER TABLE qris_orders ADD COLUMN client_ref_id TEXT;"); } catch (e) {}
-    try { sqliteDb.exec("ALTER TABLE qris_orders ADD COLUMN webhook_url TEXT;"); } catch (e) {}
-    try { sqliteDb.exec("ALTER TABLE qris_orders ADD COLUMN webhook_status TEXT DEFAULT 'PENDING';"); } catch (e) {}
-
-    // Auto-Migration for SQLite Mode
-    try {
-        sqliteDb.exec(`
-            INSERT OR IGNORE INTO merchants (merchant_id, merchant_name, merchant_type, city, static_qris, created_at, updated_at)
-            SELECT merchant_id, merchant_name, merchant_type, city, static_qris, updated_at, updated_at
-            FROM merchant_settings;
-        `);
-        const rows = sqliteDb.prepare(`SELECT session_key, merchant_id, session_data, updated_at FROM merchant_sessions`).all();
-        const stmtUpsert = sqliteDb.prepare(`
-            INSERT INTO merchants (merchant_id, merchant_name, phone_number, session_data, updated_at, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
-            ON CONFLICT(merchant_id) DO UPDATE SET
-                session_data = excluded.session_data,
-                phone_number = COALESCE(excluded.phone_number, merchants.phone_number),
-                updated_at = excluded.updated_at
-        `);
-        for (const r of rows) {
-            let parsed = null;
-            try { parsed = JSON.parse(r.session_data); } catch (e) {}
-            if (parsed && typeof parsed === 'object') {
-                const mId = parsed.merchant_id || parsed.merchantId || r.merchant_id || r.session_key;
-                const phone = parsed.phone_number || parsed.phoneNumber || parsed.phone || null;
-                if (mId && mId !== 'GOBIZ_MAIN_SESSION' && mId !== 'gobiz_primary') {
-                    stmtUpsert.run(mId, parsed.outlet_name || 'Merchant GoPay', phone, r.session_data, r.updated_at, r.updated_at);
-                }
-            }
-        }
-    } catch (e) {
-        // Silently ignore if old tables don't exist
-    }
-
-    try {
-        sqliteDb.exec(`DROP TABLE IF EXISTS merchant_sessions; DROP TABLE IF EXISTS merchant_settings;`);
-        sqliteDb.exec(`DELETE FROM merchants WHERE merchant_id IN ('active_merchant_id', 'DEFAULT', 'gopay_static_qris', 'GOBIZ_MAIN_SESSION');`);
-    } catch (e) {}
-
 }
 
 function parseQrisDetails(qrisString) {
