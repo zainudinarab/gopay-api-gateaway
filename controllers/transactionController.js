@@ -1,78 +1,82 @@
 // Transaction Controller - Fetch Mutations & Payment Checks
 const db = require('../db');
 const sessionManager = require('../sessionManager');
-const { fetchCachedTransactions, verifyPayment, autoLoginGojek, mutationCache } = require('../services/gojekService');
+const { fetchCachedTransactions, verifyPayment, autoLoginGojek, mutationCache, getActiveMerchantId } = require('../services/gojekService');
 const { logActivity } = require('../services/loggerService');
 
 const getTransactions = async (req, res) => {
     try {
         const stats = await db.getClaimedTransactionStats();
-        const dbClaimed = await db.getAllClaimedTransactions(100);
-
-        let headers = await sessionManager.getValidHeaders(req.headers['user-agent']);
-        if (!headers && process.env.GOPAY_EMAIL && process.env.GOPAY_PASSWORD) {
-            logActivity('INFO', 'Sesi tidak ditemukan, memicu auto-login...');
-            await autoLoginGojek();
-            headers = await sessionManager.getValidHeaders(req.headers['user-agent']);
-        }
+        const dbClaimed = await db.getAllClaimedTransactions(200);
 
         let rawTransactions = [];
-        if (headers) {
-            try {
-                const merchantId = req.headers['x-gopay-merchant-id'] || process.env.GOPAY_MERCHANT_ID || '';
-                rawTransactions = await fetchCachedTransactions(headers, merchantId);
-            } catch (firstErr) {
-                if (firstErr.response && firstErr.response.status === 401) {
-                    logActivity('WARNING', 'Sesi expired (401). Memulai auto-refresh...');
-                    const refreshed = await sessionManager.refreshSession();
-                    if (refreshed) {
-                        const newHeaders = await sessionManager.getValidHeaders(req.headers['user-agent']);
-                        mutationCache.data = null;
-                        rawTransactions = await fetchCachedTransactions(newHeaders, merchantId);
-                    }
-                }
+        try {
+            let headers = await sessionManager.getValidHeaders(req.headers['user-agent']);
+            if (headers) {
+                const merchantId = await getActiveMerchantId(req.headers['x-gopay-merchant-id']);
+                const fetchPromise = fetchCachedTransactions(headers, merchantId);
+                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('GoJek API Timeout')), 2500));
+                rawTransactions = await Promise.race([fetchPromise, timeoutPromise]);
             }
+        } catch (e) {
+            // Silently fallback to database records if live fetch times out or fails
         }
 
-        const filterStartMs = req.query.startTime ? parseInt(req.query.startTime, 10) * 1000 : 0;
-        const filterEndMs = req.query.endTime ? parseInt(req.query.endTime, 10) * 1000 : Date.now();
-        const pageSize = parseInt(req.query.pageSize || '50', 10);
-
+        const pageSize = parseInt(req.query.pageSize || '100', 10);
         const formattedTransactions = [];
-        if (rawTransactions && rawTransactions.length > 0) {
-            for (const tx of rawTransactions) {
-                const txMs = new Date(tx.transaction_time || tx.created_at || tx.settlement_time || 0).getTime();
-                if (txMs >= filterStartMs && txMs <= filterEndMs) {
-                    let amt = parseInt(tx.gross_amount || tx.real_gross_amount || 0, 10);
-                    if (amt > 0 && amt % 100 === 0) amt = amt / 100;
-                    const txId = tx.id || tx.order_id || tx.wallstreet_transaction_id;
-                    let claimed = await db.getClaimedTransaction(txId);
+        const seenTxIds = new Set();
 
-                    formattedTransactions.push({
-                        amount: amt,
-                        status: tx.transaction_status ? tx.transaction_status.toLowerCase() : 'success',
-                        time: tx.transaction_time || tx.settlement_time,
-                        issuer: tx.qris_provider_aspi_issuer || 'GoPay / Bank',
-                        order_id: tx.order_id,
-                        transaction_id: txId,
-                        qris_id: claimed ? claimed.qrisId : null
-                    });
-                }
+        // 1. First add live transactions from GoJek
+        if (rawTransactions && Array.isArray(rawTransactions) && rawTransactions.length > 0) {
+            for (const tx of rawTransactions) {
+                let amt = parseInt(tx.gross_amount || tx.real_gross_amount || 0, 10);
+                if (amt > 0 && amt % 100 === 0) amt = amt / 100;
+                const txId = tx.id || tx.order_id || tx.wallstreet_transaction_id;
+                if (!txId) continue;
+                let claimed = await db.getClaimedTransaction(txId);
+                seenTxIds.add(txId);
+
+                formattedTransactions.push({
+                    amount: amt,
+                    status: tx.transaction_status ? tx.transaction_status.toLowerCase() : 'success',
+                    time: tx.transaction_time || tx.settlement_time,
+                    issuer: tx.qris_provider_aspi_issuer || 'GoPay / Bank',
+                    order_id: tx.order_id,
+                    transaction_id: txId,
+                    qris_id: claimed ? claimed.qris_id : null,
+                    merchant_id: (claimed ? claimed.merchant_id : null) || tx.merchant_id || '-'
+                });
                 if (formattedTransactions.length >= pageSize) break;
             }
         }
 
-        if (formattedTransactions.length === 0 && dbClaimed.length > 0) {
+        // 2. Next add all stored transactions from database table claimed_transactions
+        if (dbClaimed && Array.isArray(dbClaimed) && dbClaimed.length > 0) {
             for (const c of dbClaimed) {
-                formattedTransactions.push({
-                    amount: c.amount,
-                    status: 'success',
-                    time: c.transaction_time || (c.claimed_at ? new Date(c.claimed_at).toISOString() : '-'),
-                    issuer: c.payer_issuer || 'GoPay / Bank',
-                    order_id: c.order_id || '-',
-                    transaction_id: c.transaction_id,
-                    qris_id: c.qris_id
-                });
+                if (!seenTxIds.has(c.transaction_id)) {
+                    seenTxIds.add(c.transaction_id);
+                    let formattedTime = c.transaction_time || '-';
+                    if ((!formattedTime || formattedTime === '-') && c.claimed_at) {
+                        try {
+                            const rawAt = Number(c.claimed_at);
+                            formattedTime = isNaN(rawAt) ? String(c.claimed_at) : new Date(rawAt > 1e11 ? rawAt : rawAt * 1000).toISOString();
+                        } catch (e) {
+                            formattedTime = String(c.claimed_at);
+                        }
+                    }
+
+                    formattedTransactions.push({
+                        amount: c.amount,
+                        status: 'success',
+                        time: formattedTime,
+                        issuer: c.payer_issuer || 'GoPay / Bank',
+                        order_id: c.order_id || '-',
+                        transaction_id: c.transaction_id,
+                        qris_id: c.qris_id || null,
+                        merchant_id: c.merchant_id || '-',
+                        claimed_at: c.claimed_at
+                    });
+                }
                 if (formattedTransactions.length >= pageSize) break;
             }
         }
@@ -86,6 +90,7 @@ const getTransactions = async (req, res) => {
             total_amount: String(calculatedTotal),
             today_amount: String(stats.todayAmount),
             stats: stats,
+            transactions: formattedTransactions,
             data: { transactions: formattedTransactions }
         });
     } catch (err) {

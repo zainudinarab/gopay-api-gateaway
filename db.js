@@ -1,6 +1,8 @@
 // Database Abstraction Layer - Complete Dual Engine: SQLite (Default Local) & PostgreSQL (DATABASE_URL)
+require('dotenv').config();
 const path = require('path');
 const fs = require('fs');
+const { cacheGet, cacheSet, cacheDel } = require('./redis');
 
 const DB_TYPE = (process.env.DB_TYPE || 'sqlite').toLowerCase();
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -56,6 +58,7 @@ if (isPostgres) {
                     CREATE TABLE IF NOT EXISTS qris_orders (
                         qris_id VARCHAR(100) PRIMARY KEY,
                         trx_id VARCHAR(100) UNIQUE,
+                        merchant_id VARCHAR(100),
                         client_ref_id VARCHAR(255),
                         webhook_url TEXT,
                         webhook_status VARCHAR(50) DEFAULT 'PENDING',
@@ -74,6 +77,7 @@ if (isPostgres) {
                         transaction_id VARCHAR(255) PRIMARY KEY,
                         order_id VARCHAR(255),
                         qris_id VARCHAR(100),
+                        merchant_id VARCHAR(100),
                         amount BIGINT NOT NULL,
                         payer_issuer VARCHAR(100),
                         payment_type VARCHAR(100),
@@ -95,24 +99,107 @@ if (isPostgres) {
                         next_attempt_at BIGINT NOT NULL
                     );
 
-                    CREATE TABLE IF NOT EXISTS merchant_sessions (
-                        session_key VARCHAR(100) PRIMARY KEY,
-                        session_data TEXT NOT NULL,
+                    CREATE TABLE IF NOT EXISTS merchants (
+                        merchant_id VARCHAR(100) PRIMARY KEY,
+                        merchant_name VARCHAR(255),
+                        phone_number VARCHAR(50),
+                        merchant_type VARCHAR(50) DEFAULT 'gopay',
+                        city VARCHAR(100),
+                        static_qris TEXT,
+                        session_data TEXT,
+                        is_active BOOLEAN DEFAULT FALSE,
+                        created_at BIGINT NOT NULL,
                         updated_at BIGINT NOT NULL
                     );
 
-                    CREATE TABLE IF NOT EXISTS merchant_settings (
+                    CREATE TABLE IF NOT EXISTS app_settings (
                         setting_key VARCHAR(100) PRIMARY KEY,
                         setting_value TEXT NOT NULL,
                         updated_at BIGINT NOT NULL
                     );
+
+                    CREATE TABLE IF NOT EXISTS api_clients (
+                        app_id VARCHAR(100) PRIMARY KEY,
+                        app_secret VARCHAR(255) NOT NULL,
+                        client_name VARCHAR(255),
+                        is_active BOOLEAN DEFAULT TRUE,
+                        created_at BIGINT NOT NULL,
+                        updated_at BIGINT NOT NULL
+                    );
                 `);
+
+                try {
+                    const defaultSecret = (process.env.APP_SECRET || 'secret123').trim();
+                    const defaultAllowed = (process.env.ALLOWED_APP_IDS || process.env.APP_IDS || 'App1,App2,admin').trim();
+                    const adminPass = (process.env.ADMIN_PASSWORD || 'admin123456').trim();
+                    const now = Date.now();
+
+                    await client.query(`
+                        INSERT INTO app_settings (setting_key, setting_value, updated_at)
+                        VALUES ('app_secret', $1, $3), ('allowed_app_ids', $2, $3)
+                        ON CONFLICT (setting_key) DO NOTHING
+                    `, [defaultSecret, defaultAllowed, now]);
+
+                    await client.query(`
+                        INSERT INTO api_clients (app_id, app_secret, client_name, is_active, created_at, updated_at)
+                        VALUES 
+                            ('admin', $1, 'Super Admin Portal', TRUE, $4, $4),
+                            ('App1', $2, 'Default Client App1', TRUE, $4, $4),
+                            ('TokoOnline', $3, 'Website Toko Online Utama', TRUE, $4, $4)
+                        ON CONFLICT (app_id) DO NOTHING
+                    `, [adminPass, defaultSecret, 'arabsecret999', now]);
+                } catch (e) {}
+
+                try { await client.query("ALTER TABLE qris_orders ADD COLUMN merchant_id VARCHAR(100);"); } catch (e) {}
+                try { await client.query("ALTER TABLE claimed_transactions ADD COLUMN merchant_id VARCHAR(100);"); } catch (e) {}
+
+                // Auto-Migration: Migrasikan data dari merchant_settings & merchant_sessions ke tabel merchants jika ada
+                try {
+                    await client.query(`
+                        INSERT INTO merchants (merchant_id, merchant_name, merchant_type, city, static_qris, created_at, updated_at)
+                        SELECT merchant_id, merchant_name, merchant_type, city, static_qris, updated_at, updated_at
+                        FROM merchant_settings
+                        ON CONFLICT (merchant_id) DO UPDATE SET
+                            merchant_name = COALESCE(EXCLUDED.merchant_name, merchants.merchant_name),
+                            merchant_type = COALESCE(EXCLUDED.merchant_type, merchants.merchant_type),
+                            city = COALESCE(EXCLUDED.city, merchants.city),
+                            static_qris = COALESCE(EXCLUDED.static_qris, merchants.static_qris)
+                    `);
+                    
+                    const sessRes = await client.query(`SELECT session_key, merchant_id, session_data, updated_at FROM merchant_sessions`);
+                    for (const s of sessRes.rows) {
+                        let parsed = null;
+                        try { parsed = JSON.parse(s.session_data); } catch (e) {}
+                        if (parsed && typeof parsed === 'object') {
+                            const mId = parsed.merchant_id || parsed.merchantId || s.merchant_id || s.session_key;
+                            const phone = parsed.phone_number || parsed.phoneNumber || parsed.phone || null;
+                            if (mId && mId !== 'GOBIZ_MAIN_SESSION' && mId !== 'gobiz_primary') {
+                                await client.query(`
+                                    INSERT INTO merchants (merchant_id, merchant_name, phone_number, session_data, updated_at, created_at)
+                                    VALUES ($1, $2, $3, $4, $5, $5)
+                                    ON CONFLICT (merchant_id) DO UPDATE SET
+                                        session_data = EXCLUDED.session_data,
+                                        phone_number = COALESCE(EXCLUDED.phone_number, merchants.phone_number),
+                                        updated_at = EXCLUDED.updated_at
+                                `, [mId, parsed.outlet_name || 'Merchant GoPay', phone, s.session_data, parseInt(s.updated_at, 10)]);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    // Silently ignore if old tables don't exist
+                }
+
+                // Hapus tabel lama merchant_sessions dan merchant_settings & bersihkan entry sistem dari tabel merchants
+                try {
+                    await client.query(`DROP TABLE IF EXISTS merchant_sessions CASCADE; DROP TABLE IF EXISTS merchant_settings CASCADE;`);
+                    await client.query(`DELETE FROM merchants WHERE merchant_id IN ('active_merchant_id', 'DEFAULT', 'gopay_static_qris', 'GOBIZ_MAIN_SESSION')`);
+                } catch (e) {}
 
                 if (process.env.GOPAY_STATIC_QRIS && process.env.GOPAY_STATIC_QRIS.trim()) {
                     await client.query(`
-                        INSERT INTO merchant_settings (setting_key, setting_value, updated_at)
-                        VALUES ('gopay_static_qris', $1, $2)
-                        ON CONFLICT (setting_key) DO NOTHING
+                        INSERT INTO merchants (merchant_id, merchant_name, merchant_type, static_qris, created_at, updated_at)
+                        VALUES ('G844728303', 'Merchant GoPay', 'gopay', $1, $2, $2)
+                        ON CONFLICT (merchant_id) DO NOTHING
                     `, [process.env.GOPAY_STATIC_QRIS.trim(), Date.now()]);
                 }
                 client.release();
@@ -139,6 +226,7 @@ if (isPostgres) {
         CREATE TABLE IF NOT EXISTS qris_orders (
             qris_id TEXT PRIMARY KEY,
             trx_id TEXT UNIQUE,
+            merchant_id TEXT,
             client_ref_id TEXT,
             webhook_url TEXT,
             webhook_status TEXT DEFAULT 'PENDING',
@@ -157,6 +245,7 @@ if (isPostgres) {
             transaction_id TEXT PRIMARY KEY,
             order_id TEXT,
             qris_id TEXT,
+            merchant_id TEXT,
             amount INTEGER NOT NULL,
             payer_issuer TEXT,
             payment_type TEXT,
@@ -178,31 +267,128 @@ if (isPostgres) {
             next_attempt_at INTEGER NOT NULL
         );
 
-        CREATE TABLE IF NOT EXISTS merchant_sessions (
-            session_key TEXT PRIMARY KEY,
-            session_data TEXT NOT NULL,
+        CREATE TABLE IF NOT EXISTS merchants (
+            merchant_id TEXT PRIMARY KEY,
+            merchant_name TEXT,
+            phone_number TEXT,
+            merchant_type TEXT DEFAULT 'gopay',
+            city TEXT,
+            static_qris TEXT,
+            session_data TEXT,
+            is_active INTEGER DEFAULT 0,
+            created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL
         );
 
-        CREATE TABLE IF NOT EXISTS merchant_settings (
+        CREATE TABLE IF NOT EXISTS app_settings (
             setting_key TEXT PRIMARY KEY,
             setting_value TEXT NOT NULL,
             updated_at INTEGER NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS api_clients (
+            app_id TEXT PRIMARY KEY,
+            app_secret TEXT NOT NULL,
+            client_name TEXT,
+            is_active INTEGER DEFAULT 1,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+        );
     `);
 
+    try {
+        const defaultSecret = (process.env.APP_SECRET || 'secret123').trim();
+        const defaultAllowed = (process.env.ALLOWED_APP_IDS || process.env.APP_IDS || 'App1,App2,admin').trim();
+        const adminPass = (process.env.ADMIN_PASSWORD || 'admin123456').trim();
+        const now = Date.now();
+        sqliteDb.prepare(`
+            INSERT OR IGNORE INTO app_settings (setting_key, setting_value, updated_at)
+            VALUES ('app_secret', ?, ?), ('allowed_app_ids', ?, ?)
+        `).run(defaultSecret, now, defaultAllowed, now);
+
+        sqliteDb.prepare(`
+            INSERT OR IGNORE INTO api_clients (app_id, app_secret, client_name, is_active, created_at, updated_at)
+            VALUES 
+                ('admin', ?, 'Super Admin Portal', 1, ?, ?),
+                ('App1', ?, 'Default Client App1', 1, ?, ?),
+                ('TokoOnline', ?, 'Website Toko Online Utama', 1, ?, ?)
+        `).run(adminPass, now, now, defaultSecret, now, now, 'arabsecret999', now, now);
+    } catch (e) {}
+
+    try { sqliteDb.exec("ALTER TABLE qris_orders ADD COLUMN merchant_id TEXT;"); } catch (e) {}
+    try { sqliteDb.exec("ALTER TABLE claimed_transactions ADD COLUMN merchant_id TEXT;"); } catch (e) {}
     try { sqliteDb.exec("ALTER TABLE qris_orders ADD COLUMN base_amount INTEGER;"); } catch (e) {}
     try { sqliteDb.exec("ALTER TABLE qris_orders ADD COLUMN unique_code INTEGER DEFAULT 0;"); } catch (e) {}
     try { sqliteDb.exec("ALTER TABLE qris_orders ADD COLUMN client_ref_id TEXT;"); } catch (e) {}
     try { sqliteDb.exec("ALTER TABLE qris_orders ADD COLUMN webhook_url TEXT;"); } catch (e) {}
     try { sqliteDb.exec("ALTER TABLE qris_orders ADD COLUMN webhook_status TEXT DEFAULT 'PENDING';"); } catch (e) {}
-    try { sqliteDb.exec("ALTER TABLE qris_orders ADD COLUMN app_id TEXT DEFAULT 'default';"); } catch (e) {}
+
+    // Auto-Migration for SQLite Mode
+    try {
+        sqliteDb.exec(`
+            INSERT OR IGNORE INTO merchants (merchant_id, merchant_name, merchant_type, city, static_qris, created_at, updated_at)
+            SELECT merchant_id, merchant_name, merchant_type, city, static_qris, updated_at, updated_at
+            FROM merchant_settings;
+        `);
+        const rows = sqliteDb.prepare(`SELECT session_key, merchant_id, session_data, updated_at FROM merchant_sessions`).all();
+        const stmtUpsert = sqliteDb.prepare(`
+            INSERT INTO merchants (merchant_id, merchant_name, phone_number, session_data, updated_at, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(merchant_id) DO UPDATE SET
+                session_data = excluded.session_data,
+                phone_number = COALESCE(excluded.phone_number, merchants.phone_number),
+                updated_at = excluded.updated_at
+        `);
+        for (const r of rows) {
+            let parsed = null;
+            try { parsed = JSON.parse(r.session_data); } catch (e) {}
+            if (parsed && typeof parsed === 'object') {
+                const mId = parsed.merchant_id || parsed.merchantId || r.merchant_id || r.session_key;
+                const phone = parsed.phone_number || parsed.phoneNumber || parsed.phone || null;
+                if (mId && mId !== 'GOBIZ_MAIN_SESSION' && mId !== 'gobiz_primary') {
+                    stmtUpsert.run(mId, parsed.outlet_name || 'Merchant GoPay', phone, r.session_data, r.updated_at, r.updated_at);
+                }
+            }
+        }
+    } catch (e) {
+        // Silently ignore if old tables don't exist
+    }
+
+    try {
+        sqliteDb.exec(`DROP TABLE IF EXISTS merchant_sessions; DROP TABLE IF EXISTS merchant_settings;`);
+        sqliteDb.exec(`DELETE FROM merchants WHERE merchant_id IN ('active_merchant_id', 'DEFAULT', 'gopay_static_qris', 'GOBIZ_MAIN_SESSION');`);
+    } catch (e) {}
+
+}
+
+function parseQrisDetails(qrisString) {
+    if (!qrisString || typeof qrisString !== 'string') return { merchantName: '', city: '' };
+    let merchantName = '';
+    let city = '';
+    let i = 0;
+    const str = qrisString.trim();
+
+    while (i < str.length - 4) {
+        const tag = str.substring(i, i + 2);
+        const len = parseInt(str.substring(i + 2, i + 4), 10);
+        if (isNaN(len) || len < 0 || i + 4 + len > str.length) break;
+        const val = str.substring(i + 4, i + 4 + len);
+
+        if (tag === '59') {
+            merchantName = val;
+        } else if (tag === '60') {
+            city = val;
+        }
+        i += 4 + len;
+    }
+
+    return { merchantName, city };
 }
 
 // Prepared Statements for SQLite Mode
 const stmtInsertOrder = sqliteDb ? sqliteDb.prepare(`
-    INSERT OR REPLACE INTO qris_orders (qris_id, trx_id, client_ref_id, app_id, webhook_url, webhook_status, amount, base_amount, unique_code, qris_code, status, created_at, expires_at)
-    VALUES (@qrisId, @trxId, @clientRefId, @appId, @webhookUrl, @webhookStatus, @amount, @baseAmount, @uniqueCode, @qrisCode, @status, @createdAt, @expiresAt)
+    INSERT OR REPLACE INTO qris_orders (qris_id, trx_id, merchant_id, client_ref_id, app_id, webhook_url, webhook_status, amount, base_amount, unique_code, qris_code, status, created_at, expires_at)
+    VALUES (@qrisId, @trxId, @merchantId, @clientRefId, @appId, @webhookUrl, @webhookStatus, @amount, @baseAmount, @uniqueCode, @qrisCode, @status, @createdAt, @expiresAt)
 `) : null;
 
 const stmtGetOrder = sqliteDb ? sqliteDb.prepare(`SELECT * FROM qris_orders WHERE qris_id = ?`) : null;
@@ -211,8 +397,8 @@ const stmtUpdateOrderWebhookStatus = sqliteDb ? sqliteDb.prepare(`UPDATE qris_or
 const stmtGetClaimedTx = sqliteDb ? sqliteDb.prepare(`SELECT * FROM claimed_transactions WHERE transaction_id = ?`) : null;
 const stmtGetOrderByTrxId = sqliteDb ? sqliteDb.prepare(`SELECT * FROM qris_orders WHERE trx_id = ? OR qris_id = ?`) : null;
 const stmtClaimTx = sqliteDb ? sqliteDb.prepare(`
-    INSERT OR REPLACE INTO claimed_transactions (transaction_id, order_id, qris_id, amount, payer_issuer, payment_type, transaction_time, claimed_at)
-    VALUES (@txId, @orderId, @qrisId, @amount, @payerIssuer, @paymentType, @transactionTime, @claimedAt)
+    INSERT OR REPLACE INTO claimed_transactions (transaction_id, order_id, qris_id, merchant_id, amount, payer_issuer, payment_type, transaction_time, claimed_at)
+    VALUES (@txId, @orderId, @qrisId, @merchantId, @amount, @payerIssuer, @paymentType, @transactionTime, @claimedAt)
 `) : null;
 const stmtCleanExpiredClaims = sqliteDb ? sqliteDb.prepare(`DELETE FROM claimed_transactions WHERE claimed_at < ?`) : null;
 const stmtGetAllOrders = sqliteDb ? sqliteDb.prepare(`SELECT * FROM qris_orders ORDER BY created_at DESC LIMIT ?`) : null;
@@ -334,15 +520,16 @@ module.exports = {
         const createdAt = order.createdAt ? (typeof order.createdAt === 'object' ? order.createdAt.getTime() : order.createdAt) : Date.now();
         const expiresAt = typeof order.expiresAt === 'object' ? order.expiresAt.getTime() : order.expiresAt;
         const qrisCode = order.data || order.qrisCode || order.qrisString || '';
+        const merchantId = order.merchantId || order.merchant_id || null;
 
         if (isPostgres) {
             try {
                 await pgPool.query(`
-                    INSERT INTO qris_orders (qris_id, trx_id, client_ref_id, app_id, webhook_url, webhook_status, amount, base_amount, unique_code, qris_code, status, created_at, expires_at)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-                    ON CONFLICT (qris_id) DO UPDATE SET status = EXCLUDED.status, webhook_status = EXCLUDED.webhook_status
+                    INSERT INTO qris_orders (qris_id, trx_id, merchant_id, client_ref_id, app_id, webhook_url, webhook_status, amount, base_amount, unique_code, qris_code, status, created_at, expires_at)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                    ON CONFLICT (qris_id) DO UPDATE SET status = EXCLUDED.status, webhook_status = EXCLUDED.webhook_status, merchant_id = EXCLUDED.merchant_id
                 `, [
-                    qrisId, order.trxId, order.clientRefId || order.refId || null, order.appId || 'default',
+                    qrisId, order.trxId, merchantId, order.clientRefId || order.refId || null, order.appId || 'default',
                     order.webhookUrl || null, order.webhookUrl ? 'PENDING' : 'NONE', order.amount,
                     order.baseAmount || order.amount, order.uniqueCode || 0, qrisCode, order.status || 'PENDING',
                     createdAt, expiresAt
@@ -354,6 +541,7 @@ module.exports = {
             stmtInsertOrder.run({
                 qrisId,
                 trxId: order.trxId,
+                merchantId,
                 clientRefId: order.clientRefId || order.refId || null,
                 appId: order.appId || 'default',
                 webhookUrl: order.webhookUrl || null,
@@ -520,14 +708,16 @@ module.exports = {
             if (orderRow) publicQrisId = orderRow.qris_id;
         }
 
+        const merchantId = claim.merchantId || claim.merchant_id || (claim.order ? claim.order.merchantId : null);
+
         if (isPostgres) {
             try {
                 await pgPool.query(`
-                    INSERT INTO claimed_transactions (transaction_id, order_id, qris_id, amount, payer_issuer, payment_type, transaction_time, claimed_at)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                    ON CONFLICT (transaction_id) DO UPDATE SET qris_id = EXCLUDED.qris_id
+                    INSERT INTO claimed_transactions (transaction_id, order_id, qris_id, merchant_id, amount, payer_issuer, payment_type, transaction_time, claimed_at)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                    ON CONFLICT (transaction_id) DO UPDATE SET qris_id = EXCLUDED.qris_id, merchant_id = EXCLUDED.merchant_id
                 `, [
-                    txId, claim.order_id || null, publicQrisId, claim.amount,
+                    txId, claim.order_id || null, publicQrisId, merchantId, claim.amount,
                     claim.payer_issuer || 'GoPay / Bank', claim.payment_type || 'QRIS',
                     claim.transaction_time || null, Date.now()
                 ]);
@@ -539,6 +729,7 @@ module.exports = {
                 txId,
                 orderId: claim.order_id || null,
                 qrisId: publicQrisId,
+                merchantId,
                 amount: claim.amount,
                 payerIssuer: claim.payer_issuer || 'GoPay / Bank',
                 paymentType: claim.payment_type || 'QRIS',
@@ -752,6 +943,7 @@ module.exports = {
                     transaction_id: r.transaction_id,
                     order_id: r.order_id,
                     qris_id: r.qris_id,
+                    merchant_id: r.merchant_id,
                     amount: parseInt(r.amount, 10),
                     payer_issuer: r.payer_issuer,
                     payment_type: r.payment_type,
@@ -769,6 +961,7 @@ module.exports = {
                 transaction_id: r.transaction_id,
                 order_id: r.order_id,
                 qris_id: r.qris_id,
+                merchant_id: r.merchant_id,
                 amount: r.amount,
                 payer_issuer: r.payer_issuer,
                 payment_type: r.payment_type,
@@ -776,6 +969,7 @@ module.exports = {
                 claimed_at: r.claimed_at
             }));
         } catch (e) {
+            console.error('[SQLITE GET ALL CLAIMED TX ERROR]:', e.message);
             return [];
         }
     },
@@ -811,128 +1005,654 @@ module.exports = {
         }
     },
 
-    async saveMerchantSession(sessionData, key = 'GOBIZ_MAIN_SESSION') {
-        if (!sessionData) return;
-        let str;
-        if (typeof sessionData === 'string') {
-            str = sessionData;
-        } else {
-            try {
-                str = JSON.stringify(sessionData);
-            } catch (e) {
-                str = String(sessionData);
-            }
+    // ────────────── UNIFIED MERCHANTS TABLE METHODS ──────────────
+
+    async saveMerchant(merchantData) {
+        if (!merchantData || !merchantData.merchant_id) return false;
+        const mId = String(merchantData.merchant_id).trim();
+        const reservedIds = ['active_merchant_id', 'DEFAULT', 'gopay_static_qris', 'GOBIZ_MAIN_SESSION'];
+        if (reservedIds.includes(mId)) {
+            return false;
         }
+        const mName = String(merchantData.merchant_name || 'Merchant GoPay').trim();
+        const phone = merchantData.phone_number ? String(merchantData.phone_number).trim() : null;
+        const mType = String(merchantData.merchant_type || 'gopay').toLowerCase().trim();
+        const city = merchantData.city ? String(merchantData.city).trim() : '';
+        const staticQris = merchantData.static_qris ? String(merchantData.static_qris).trim() : null;
+        const sessionData = merchantData.session_data ? (typeof merchantData.session_data === 'object' ? JSON.stringify(merchantData.session_data) : String(merchantData.session_data)) : null;
+        const isActive = merchantData.is_active ? 1 : 0;
+        const now = Date.now();
+
         if (isPostgres) {
             try {
                 await pgPool.query(`
-                    INSERT INTO merchant_sessions (session_key, session_data, updated_at)
-                    VALUES ($1, $2, $3)
-                    ON CONFLICT (session_key) DO UPDATE SET session_data = EXCLUDED.session_data, updated_at = EXCLUDED.updated_at
-                `, [key, str, Date.now()]);
+                    INSERT INTO merchants (merchant_id, merchant_name, phone_number, merchant_type, city, static_qris, session_data, is_active, created_at, updated_at)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)
+                    ON CONFLICT (merchant_id) DO UPDATE SET
+                        merchant_name = EXCLUDED.merchant_name,
+                        phone_number = COALESCE(EXCLUDED.phone_number, merchants.phone_number),
+                        merchant_type = EXCLUDED.merchant_type,
+                        city = EXCLUDED.city,
+                        static_qris = COALESCE(EXCLUDED.static_qris, merchants.static_qris),
+                        session_data = COALESCE(EXCLUDED.session_data, merchants.session_data),
+                        updated_at = EXCLUDED.updated_at
+                `, [mId, mName, phone, mType, city, staticQris, sessionData, isActive, now]);
+
+                return true;
             } catch (e) {
-                console.error('[PG SAVE SESSION ERROR]:', e.message);
+                console.error('[PG SAVE MERCHANT ERROR]:', e.message);
+                return false;
             }
         } else {
-            sqliteDb.prepare(`
-                INSERT OR REPLACE INTO merchant_sessions (session_key, session_data, updated_at)
-                VALUES (?, ?, ?)
-            `).run(key, str, Date.now());
-        }
-    },
-
-    async getMerchantSession(key = 'GOBIZ_MAIN_SESSION') {
-        if (isPostgres) {
             try {
-                let res = await pgPool.query(`SELECT session_data FROM merchant_sessions WHERE session_key = $1`, [key]);
-                if (res.rows.length === 0 || !res.rows[0].session_data) {
-                    res = await pgPool.query(`SELECT session_data FROM merchant_sessions ORDER BY updated_at DESC LIMIT 1`);
-                }
-                if (res.rows.length === 0 || !res.rows[0].session_data) return null;
-                const str = res.rows[0].session_data;
-                try {
-                    return JSON.parse(str);
-                } catch (e) {
-                    return str;
-                }
+                sqliteDb.prepare(`
+                    INSERT INTO merchants (merchant_id, merchant_name, phone_number, merchant_type, city, static_qris, session_data, is_active, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(merchant_id) DO UPDATE SET
+                        merchant_name = excluded.merchant_name,
+                        phone_number = COALESCE(excluded.phone_number, merchants.phone_number),
+                        merchant_type = excluded.merchant_type,
+                        city = excluded.city,
+                        static_qris = COALESCE(excluded.static_qris, merchants.static_qris),
+                        session_data = COALESCE(excluded.session_data, merchants.session_data),
+                        updated_at = excluded.updated_at
+                `).run(mId, mName, phone, mType, city, staticQris, sessionData, isActive, now, now);
+
+                return true;
             } catch (e) {
-                console.error('[PG GET SESSION ERROR]:', e.message);
-                return null;
+                console.error('[SQLITE SAVE MERCHANT ERROR]:', e.message);
+                return false;
             }
         }
-        let row = sqliteDb.prepare(`SELECT session_data FROM merchant_sessions WHERE session_key = ?`).get(key);
-        if (!row || !row.session_data) {
-            row = sqliteDb.prepare(`SELECT session_data FROM merchant_sessions ORDER BY updated_at DESC LIMIT 1`).get();
-        }
-        if (!row || !row.session_data) return null;
-        try {
-            return JSON.parse(row.session_data);
-        } catch (e) {
-            return row.session_data;
-        }
     },
 
-    async deleteMerchantSession(key = 'gobiz_primary') {
+    async updateMerchantSession(merchantId, sessionData, setActive = true) {
+        if (!merchantId) return false;
+        const mId = String(merchantId).trim();
+        const strSession = typeof sessionData === 'object' ? JSON.stringify(sessionData) : String(sessionData || '');
+        const now = Date.now();
+
+        if (setActive) {
+            await this.setActiveMerchant(mId);
+        }
+
         if (isPostgres) {
             try {
-                await pgPool.query(`DELETE FROM merchant_sessions WHERE session_key = $1`, [key]);
-            } catch (e) {}
+                await pgPool.query(`
+                    UPDATE merchants SET session_data = $1, is_active = $2, updated_at = $3 WHERE merchant_id = $4
+                `, [strSession, setActive, now, mId]);
+                return true;
+            } catch (e) {
+                console.error('[PG UPDATE MERCHANT SESSION ERROR]:', e.message);
+                return false;
+            }
         } else {
-            sqliteDb.prepare(`DELETE FROM merchant_sessions WHERE session_key = ?`).run(key);
+            try {
+                sqliteDb.prepare(`UPDATE merchants SET session_data = ?, is_active = ?, updated_at = ? WHERE merchant_id = ?`)
+                    .run(strSession, setActive ? 1 : 0, now, mId);
+                return true;
+            } catch (e) {
+                console.error('[SQLITE UPDATE MERCHANT SESSION ERROR]:', e.message);
+                return false;
+            }
         }
     },
 
-    async saveSetting(key, val) {
-        if (!key) return;
-        const strVal = String(val || '');
+    async getMerchantById(merchantId) {
+        if (!merchantId) return null;
+        const mId = String(merchantId).trim();
+        if (isPostgres) {
+            try {
+                const res = await pgPool.query(`SELECT * FROM merchants WHERE merchant_id = $1`, [mId]);
+                return res.rows.length > 0 ? res.rows[0] : null;
+            } catch (e) { return null; }
+        } else {
+            try {
+                return sqliteDb.prepare(`SELECT * FROM merchants WHERE merchant_id = ?`).get(mId) || null;
+            } catch (e) { return null; }
+        }
+    },
+
+    async getActiveMerchant() {
+        if (isPostgres) {
+            try {
+                let res = await pgPool.query(`SELECT * FROM merchants WHERE is_active = TRUE LIMIT 1`);
+                if (res.rows.length === 0) {
+                    res = await pgPool.query(`SELECT * FROM merchants WHERE session_data IS NOT NULL ORDER BY updated_at DESC LIMIT 1`);
+                }
+                if (res.rows.length === 0) {
+                    res = await pgPool.query(`SELECT * FROM merchants ORDER BY updated_at DESC LIMIT 1`);
+                }
+                return res.rows.length > 0 ? res.rows[0] : null;
+            } catch (e) { return null; }
+        } else {
+            try {
+                let row = sqliteDb.prepare(`SELECT * FROM merchants WHERE is_active = 1 LIMIT 1`).get();
+                if (!row) {
+                    row = sqliteDb.prepare(`SELECT * FROM merchants WHERE session_data IS NOT NULL ORDER BY updated_at DESC LIMIT 1`).get();
+                }
+                if (!row) {
+                    row = sqliteDb.prepare(`SELECT * FROM merchants ORDER BY updated_at DESC LIMIT 1`).get();
+                }
+                return row || null;
+            } catch (e) { return null; }
+        }
+    },
+
+    async setActiveMerchant(merchantId) {
+        if (!merchantId) return false;
+        const mId = String(merchantId).trim();
         const now = Date.now();
         if (isPostgres) {
             try {
-                await pgPool.query(`
-                    INSERT INTO merchant_settings (setting_key, setting_value, updated_at)
-                    VALUES ($1, $2, $3)
-                    ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = EXCLUDED.updated_at
-                `, [key, strVal, now]);
-            } catch (e) {
-                console.error('[PG SAVE SETTING ERROR]:', e.message);
-            }
+                await pgPool.query(`UPDATE merchants SET is_active = FALSE`);
+                await pgPool.query(`UPDATE merchants SET is_active = TRUE, updated_at = $1 WHERE merchant_id = $2`, [now, mId]);
+                return true;
+            } catch (e) { return false; }
         } else {
-            sqliteDb.prepare(`
-                INSERT OR REPLACE INTO merchant_settings (setting_key, setting_value, updated_at)
-                VALUES (?, ?, ?)
-            `).run(key, strVal, now);
+            try {
+                sqliteDb.prepare(`UPDATE merchants SET is_active = 0`).run();
+                sqliteDb.prepare(`UPDATE merchants SET is_active = 1, updated_at = ? WHERE merchant_id = ?`).run(now, mId);
+                return true;
+            } catch (e) { return false; }
         }
     },
 
-    async getSetting(key) {
-        if (!key) return null;
+    async getAllMerchants() {
+        let rows = [];
         if (isPostgres) {
             try {
-                const res = await pgPool.query(`SELECT setting_value FROM merchant_settings WHERE setting_key = $1`, [key]);
-                return res.rows.length > 0 ? res.rows[0].setting_value : null;
+                const res = await pgPool.query(`SELECT * FROM merchants WHERE merchant_id NOT IN ('active_merchant_id', 'DEFAULT', 'gopay_static_qris', 'GOBIZ_MAIN_SESSION') ORDER BY updated_at DESC`);
+                rows = res.rows;
             } catch (e) {
-                return null;
+                console.error('[PG GET ALL MERCHANTS ERROR]:', e.message);
+                return [];
             }
         } else {
             try {
-                const row = sqliteDb.prepare(`SELECT setting_value FROM merchant_settings WHERE setting_key = ?`).get(key);
-                return row ? row.setting_value : null;
+                rows = sqliteDb.prepare(`SELECT * FROM merchants WHERE merchant_id NOT IN ('active_merchant_id', 'DEFAULT', 'gopay_static_qris', 'GOBIZ_MAIN_SESSION') ORDER BY updated_at DESC`).all();
             } catch (e) {
-                return null;
+                return [];
+            }
+        }
+
+        const hasAnyActive = rows.some(r => r.is_active);
+
+        return rows.map((r, idx) => {
+            let sessionParsed = null;
+            if (r.session_data) {
+                try { sessionParsed = JSON.parse(r.session_data); } catch (e) {}
+            }
+            const phone = r.phone_number || (sessionParsed && (sessionParsed.phone_number || sessionParsed.phoneNumber || sessionParsed.phone)) || '-';
+            const isActive = Boolean(r.is_active) || (!hasAnyActive && idx === 0);
+
+            return {
+                merchantId: r.merchant_id,
+                merchant_id: r.merchant_id,
+                merchantName: r.merchant_name || 'Merchant GoPay',
+                merchant_name: r.merchant_name || 'Merchant GoPay',
+                phoneNumber: phone,
+                phone_number: phone,
+                merchantType: r.merchant_type || 'gopay',
+                merchant_type: r.merchant_type || 'gopay',
+                city: r.city || '',
+                staticQris: r.static_qris || '',
+                static_qris: r.static_qris || '',
+                hasSession: Boolean(r.session_data),
+                isActive: isActive,
+                updatedAt: parseInt(r.updated_at, 10)
+            };
+        });
+    },
+
+    async setActiveMerchant(merchantId) {
+        if (!merchantId) return false;
+        const mId = String(merchantId).trim();
+        
+        if (isPostgres) {
+            try {
+                await pgPool.query(`UPDATE merchants SET is_active = FALSE`);
+                await pgPool.query(`UPDATE merchants SET is_active = TRUE WHERE merchant_id = $1`, [mId]);
+            } catch (e) {
+                console.error('[PG SET ACTIVE MERCHANT ERROR]:', e.message);
+            }
+        } else {
+            try {
+                sqliteDb.prepare(`UPDATE merchants SET is_active = 0`).run();
+                sqliteDb.prepare(`UPDATE merchants SET is_active = 1 WHERE merchant_id = ?`).run(mId);
+            } catch (e) {}
+        }
+        return true;
+    },
+
+    async deleteMerchantSession(merchantId = null) {
+        if (isPostgres) {
+            try {
+                if (merchantId) {
+                    await pgPool.query(`UPDATE merchants SET session_data = NULL, updated_at = NOW() WHERE merchant_id = $1`, [merchantId]);
+                } else {
+                    await pgPool.query(`UPDATE merchants SET session_data = NULL, updated_at = NOW()`);
+                }
+            } catch (e) {
+                console.error('[PG DELETE MERCHANT SESSION ERROR]:', e.message);
+            }
+        } else {
+            try {
+                if (merchantId) {
+                    sqliteDb.prepare(`UPDATE merchants SET session_data = NULL, updated_at = CURRENT_TIMESTAMP WHERE merchant_id = ?`).run(merchantId);
+                } else {
+                    sqliteDb.prepare(`UPDATE merchants SET session_data = NULL, updated_at = CURRENT_TIMESTAMP`).run();
+                }
+            } catch (e) {}
+        }
+        return true;
+    },
+
+    async deleteMerchant(merchantId) {
+        if (!merchantId) return false;
+        const mId = String(merchantId).trim();
+        if (isPostgres) {
+            try {
+                await pgPool.query(`DELETE FROM merchants WHERE merchant_id = $1`, [mId]);
+                return true;
+            } catch (e) {
+                console.error('[PG DELETE MERCHANT ERROR]:', e.message);
+                return false;
+            }
+        } else {
+            try {
+                sqliteDb.prepare(`DELETE FROM merchants WHERE merchant_id = ?`).run(mId);
+                return true;
+            } catch (e) {
+                console.error('[SQLITE DELETE MERCHANT ERROR]:', e.message);
+                return false;
             }
         }
     },
 
-    async getStaticQris() {
-        const val = await this.getSetting('gopay_static_qris');
-        return val || process.env.GOPAY_STATIC_QRIS || '';
+    // Wrappers untuk backward compatibility
+    async saveMerchantSession(sessionData, key = null) {
+        if (!sessionData) return;
+        let parsed = null;
+        if (typeof sessionData === 'string') {
+            try { parsed = JSON.parse(sessionData); } catch (e) {}
+        } else {
+            parsed = sessionData;
+        }
+
+        const mId = (parsed && (parsed.merchant_id || parsed.merchantId)) ? (parsed.merchant_id || parsed.merchantId) : (key && key !== 'GOBIZ_MAIN_SESSION' ? key : null);
+        
+        let targetMerchant = null;
+        if (mId) {
+            targetMerchant = await this.getMerchantById(mId);
+        }
+        if (!targetMerchant) {
+            targetMerchant = await this.getActiveMerchant();
+        }
+
+        const finalMerchantId = targetMerchant ? targetMerchant.merchant_id : (mId || 'G844728303');
+        const phone = parsed && (parsed.phone_number || parsed.phoneNumber || parsed.phone);
+
+        await this.saveMerchant({
+            merchant_id: finalMerchantId,
+            merchant_name: (parsed && (parsed.outlet_name || parsed.merchant_name)) || (targetMerchant && targetMerchant.merchant_name) || 'Merchant GoPay',
+            phone_number: phone || (targetMerchant && targetMerchant.phone_number) || null,
+            session_data: sessionData,
+            is_active: true
+        });
     },
 
-    async saveStaticQris(qrisString) {
-        if (!qrisString) return;
-        await this.saveSetting('gopay_static_qris', qrisString.trim());
+    async getMerchantSession(key = 'GOBIZ_MAIN_SESSION') {
+        let activeM = null;
+        if (key && key !== 'GOBIZ_MAIN_SESSION' && key !== 'gobiz_primary') {
+            activeM = await this.getMerchantById(key);
+        }
+        if (!activeM) {
+            activeM = await this.getActiveMerchant();
+        }
+        if (activeM && activeM.session_data) {
+            try {
+                return JSON.parse(activeM.session_data);
+            } catch (e) {
+                return activeM.session_data;
+            }
+        }
+        return null;
     },
+
+    async deleteMerchantSession(key = 'gobiz_primary') {
+        const activeM = await this.getActiveMerchant();
+        if (activeM) {
+            await this.updateMerchantSession(activeM.merchant_id, null, false);
+        }
+    },
+
+    async saveSetting(merchantId, staticQris, merchantType = 'gopay', customMerchantName = null, customCity = null) {
+        if (!merchantId) return;
+        const mId = String(merchantId).trim();
+        const strVal = String(staticQris || '').trim();
+        const mType = String(merchantType || 'gopay').toLowerCase().trim();
+        const parsed = parseQrisDetails(strVal);
+        const mName = customMerchantName || parsed.merchantName || 'Merchant GoPay';
+        const mCity = customCity || parsed.city || '';
+
+        await this.saveMerchant({
+            merchant_id: mId,
+            merchant_name: mName,
+            merchant_type: mType,
+            city: mCity,
+            static_qris: strVal
+        });
+    },
+
+    async getSetting(merchantId) {
+        if (!merchantId) return null;
+        const m = await this.getMerchantById(merchantId);
+        if (m && m.static_qris) return m.static_qris;
+        const activeM = await this.getActiveMerchant();
+        return activeM ? activeM.static_qris : null;
+    },
+
+    async getStaticQris(merchantId = null) {
+        let mId = merchantId;
+        if (!mId) {
+            const activeM = await this.getActiveMerchant();
+            if (activeM) mId = activeM.merchant_id;
+        }
+
+        if (mId) {
+            const m = await this.getMerchantById(mId);
+            if (m && m.static_qris && m.static_qris.trim()) {
+                return m.static_qris.trim();
+            }
+        }
+
+        const defaultM = await this.getMerchantById('DEFAULT');
+        if (defaultM && defaultM.static_qris) return defaultM.static_qris.trim();
+        return (process.env.GOPAY_STATIC_QRIS || '').trim();
+    },
+
+    async saveStaticQris(qrisString, merchantId = null, merchantType = 'gopay', merchantName = null, city = null) {
+        if (!qrisString) return;
+        let mId = merchantId;
+        if (!mId) {
+            const activeM = await this.getActiveMerchant();
+            if (activeM) mId = activeM.merchant_id;
+        }
+        if (!mId) mId = 'G844728303';
+
+        await this.saveSetting(mId, qrisString, merchantType, merchantName, city);
+    },
+
+    async getAllMerchantSettings() {
+        return await this.getAllMerchants();
+    },
+
+    async updateMerchantSettings(merchantId, fields = {}) {
+        if (!merchantId) return { success: false, message: 'merchant_id wajib diisi' };
+        const mId = String(merchantId).trim();
+        const existing = await this.getMerchantById(mId);
+
+        const updateData = {
+            merchant_id: mId,
+            merchant_name: fields.merchant_name !== undefined ? fields.merchant_name : (existing ? existing.merchant_name : 'Merchant GoPay'),
+            phone_number: fields.phone_number !== undefined ? fields.phone_number : (existing ? existing.phone_number : null),
+            merchant_type: fields.merchant_type !== undefined ? fields.merchant_type : (existing ? existing.merchant_type : 'gopay'),
+            city: fields.city !== undefined ? fields.city : (existing ? existing.city : ''),
+            static_qris: fields.static_qris !== undefined ? fields.static_qris : (existing ? existing.static_qris : null),
+            session_data: fields.session_data !== undefined ? fields.session_data : (existing ? existing.session_data : null)
+        };
+
+        const success = await this.saveMerchant(updateData);
+        return { success, message: success ? `Data Merchant ${mId} berhasil diperbarui` : 'Gagal mengupdate merchant' };
+    },
+
+    async getAppSetting(key, defaultValue = '') {
+        if (!key) return defaultValue;
+        const cleanKey = String(key).trim();
+        if (isPostgres) {
+            try {
+                const res = await pgPool.query(`SELECT setting_value FROM app_settings WHERE setting_key = $1`, [cleanKey]);
+                if (res.rows.length > 0) return res.rows[0].setting_value;
+            } catch (e) {}
+        } else {
+            try {
+                const row = sqliteDb.prepare(`SELECT setting_value FROM app_settings WHERE setting_key = ?`).get(cleanKey);
+                if (row) return row.setting_value;
+            } catch (e) {}
+        }
+        return defaultValue;
+    },
+
+    async setAppSetting(key, value) {
+        if (!key) return false;
+        const cleanKey = String(key).trim();
+        const cleanVal = String(value || '').trim();
+        const now = Date.now();
+
+        if (isPostgres) {
+            try {
+                await pgPool.query(`
+                    INSERT INTO app_settings (setting_key, setting_value, updated_at)
+                    VALUES ($1, $2, $3)
+                    ON CONFLICT (setting_key) DO UPDATE SET
+                        setting_value = EXCLUDED.setting_value,
+                        updated_at = EXCLUDED.updated_at
+                `, [cleanKey, cleanVal, now]);
+                return true;
+            } catch (e) {
+                console.error('[PG SET APP SETTING ERROR]:', e.message);
+            }
+        } else {
+            try {
+                sqliteDb.prepare(`
+                    INSERT INTO app_settings (setting_key, setting_value, updated_at)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(setting_key) DO UPDATE SET
+                        setting_value = excluded.setting_value,
+                        updated_at = excluded.updated_at
+                `).run(cleanKey, cleanVal, now);
+                return true;
+            } catch (e) {}
+        }
+        return false;
+    },
+
+    async getAppSecret() {
+        const val = await this.getAppSetting('app_secret');
+        if (val && val.trim()) return val.trim();
+        return (process.env.APP_SECRET || 'secret123').trim();
+    },
+
+    async setAppSecret(secret) {
+        return await this.setAppSetting('app_secret', secret);
+    },
+
+    async getAllowedAppIds() {
+        const val = await this.getAppSetting('allowed_app_ids');
+        let raw = val;
+        if (!raw || !raw.trim()) {
+            raw = process.env.ALLOWED_APP_IDS || process.env.APP_IDS || 'App1,App2,admin';
+        }
+        return raw.split(',').map(s => s.trim()).filter(Boolean);
+    },
+
+    async setAllowedAppIds(appIds) {
+        let valStr = '';
+        if (Array.isArray(appIds)) {
+            valStr = appIds.map(s => String(s).trim()).filter(Boolean).join(',');
+        } else {
+            valStr = String(appIds || '').trim();
+        }
+        return await this.setAppSetting('allowed_app_ids', valStr);
+    },
+
+    async getAllApiClients() {
+        let rows = [];
+        if (isPostgres) {
+            try {
+                const res = await pgPool.query(`SELECT * FROM api_clients ORDER BY created_at ASC`);
+                rows = res.rows;
+            } catch (e) {
+                console.error('[PG GET ALL API CLIENTS ERROR]:', e.message);
+                return [];
+            }
+        } else {
+            try {
+                rows = sqliteDb.prepare(`SELECT * FROM api_clients ORDER BY created_at ASC`).all();
+            } catch (e) {
+                return [];
+            }
+        }
+        return rows.map(r => ({
+            appId: r.app_id,
+            app_id: r.app_id,
+            appSecret: r.app_secret,
+            app_secret: r.app_secret,
+            clientName: r.client_name || r.app_id,
+            client_name: r.client_name || r.app_id,
+            isActive: Boolean(r.is_active),
+            is_active: Boolean(r.is_active),
+            createdAt: parseInt(r.created_at, 10),
+            updatedAt: parseInt(r.updated_at, 10)
+        }));
+    },
+
+    async getApiClient(appId) {
+        if (!appId) return null;
+        const cleanId = String(appId).trim();
+        const cacheKey = 'api_client:' + cleanId;
+
+        // 1. Try Redis Cache first (Fast <1ms lookup)
+        const cached = await cacheGet(cacheKey);
+        if (cached && typeof cached === 'object' && (cached.app_id || cached.appId)) {
+            return cached;
+        }
+
+        // 2. Cache MISS -> Query PostgreSQL / SQLite
+        let r = null;
+        if (isPostgres) {
+            try {
+                const res = await pgPool.query(`SELECT * FROM api_clients WHERE app_id = $1`, [cleanId]);
+                if (res.rows.length > 0) r = res.rows[0];
+            } catch (e) {}
+        } else {
+            try {
+                r = sqliteDb.prepare(`SELECT * FROM api_clients WHERE app_id = ?`).get(cleanId);
+            } catch (e) {}
+        }
+
+        if (!r) return null;
+
+        const clientData = {
+            appId: r.app_id,
+            app_id: r.app_id,
+            appSecret: r.app_secret,
+            app_secret: r.app_secret,
+            clientName: r.client_name || r.app_id,
+            client_name: r.client_name || r.app_id,
+            isActive: Boolean(r.is_active),
+            is_active: Boolean(r.is_active)
+        };
+
+        // 3. Save to Redis Cache (TTL 1 Hour = 3600 seconds)
+        await cacheSet(cacheKey, clientData, 3600);
+
+        return clientData;
+    },
+
+    async saveApiClient(appId, appSecret, clientName = '', isActive = true) {
+        if (!appId || !appSecret) return false;
+        const cleanId = String(appId).trim();
+        const cleanSecret = String(appSecret).trim();
+        const cleanName = String(clientName || cleanId).trim();
+        const activeBool = Boolean(isActive);
+        const now = Date.now();
+        let success = false;
+
+        if (isPostgres) {
+            try {
+                await pgPool.query(`
+                    INSERT INTO api_clients (app_id, app_secret, client_name, is_active, created_at, updated_at)
+                    VALUES ($1, $2, $3, $4, $5, $5)
+                    ON CONFLICT (app_id) DO UPDATE SET
+                        app_secret = EXCLUDED.app_secret,
+                        client_name = EXCLUDED.client_name,
+                        is_active = EXCLUDED.is_active,
+                        updated_at = EXCLUDED.updated_at
+                `, [cleanId, cleanSecret, cleanName, activeBool, now]);
+                success = true;
+            } catch (e) {
+                console.error('[PG SAVE API CLIENT ERROR]:', e.message);
+            }
+        } else {
+            try {
+                sqliteDb.prepare(`
+                    INSERT INTO api_clients (app_id, app_secret, client_name, is_active, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(app_id) DO UPDATE SET
+                        app_secret = excluded.app_secret,
+                        client_name = excluded.client_name,
+                        is_active = excluded.is_active,
+                        updated_at = excluded.updated_at
+                `).run(cleanId, cleanSecret, cleanName, activeBool ? 1 : 0, now, now);
+                success = true;
+            } catch (e) {}
+        }
+
+        if (success) {
+            // Update Redis cache immediately
+            const clientData = {
+                appId: cleanId,
+                app_id: cleanId,
+                appSecret: cleanSecret,
+                app_secret: cleanSecret,
+                clientName: cleanName,
+                client_name: cleanName,
+                isActive: activeBool,
+                is_active: activeBool
+            };
+            await cacheSet('api_client:' + cleanId, clientData, 3600);
+        }
+
+        return success;
+    },
+
+    async deleteApiClient(appId) {
+        if (!appId) return false;
+        const cleanId = String(appId).trim();
+        let success = false;
+        if (isPostgres) {
+            try {
+                await pgPool.query(`DELETE FROM api_clients WHERE app_id = $1`, [cleanId]);
+                success = true;
+            } catch (e) {}
+        } else {
+            try {
+                sqliteDb.prepare(`DELETE FROM api_clients WHERE app_id = ?`).run(cleanId);
+                success = true;
+            } catch (e) {}
+        }
+
+        if (success) {
+            // Invalidate Redis cache immediately
+            await cacheDel('api_client:' + cleanId);
+        }
+        return success;
+    },
+
+    async verifyApiClient(appId, appSecret) {
+        if (!appId || !appSecret) return false;
+        const client = await this.getApiClient(appId);
+        if (!client) return false;
+        if (!client.isActive) return false;
+        return client.appSecret === String(appSecret).trim();
+    },
+
+
 
     isPostgres,
-    dbType: isPostgres ? 'PostgreSQL' : 'SQLite WAL'
+    dbType: isPostgres ? 'PostgreSQL' : 'SQLite WAL',
+    pgPool,
+    sqliteDb
 };

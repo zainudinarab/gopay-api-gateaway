@@ -41,6 +41,17 @@ async function autoLoginGojek() {
     });
 }
 
+async function getActiveMerchantId(customMerchantId = null) {
+    if (customMerchantId) return customMerchantId;
+    try {
+        const sess = await db.getMerchantSession();
+        if (sess && (sess.merchant_id || sess.merchantId)) {
+            return sess.merchant_id || sess.merchantId;
+        }
+    } catch (e) {}
+    return process.env.GOPAY_MERCHANT_ID || '';
+}
+
 async function fetchCachedTransactions(headers, customMerchantId, forceRefresh = false) {
     const now = new Date();
     const nowMs = now.getTime();
@@ -48,7 +59,7 @@ async function fetchCachedTransactions(headers, customMerchantId, forceRefresh =
         return mutationCache.data;
     }
 
-    const merchantId = customMerchantId || process.env.GOPAY_MERCHANT_ID || '';
+    const merchantId = await getActiveMerchantId(customMerchantId);
     const startTimeISO = new Date(nowMs - 24 * 60 * 60 * 1000).toISOString();
     const endTimeISO = now.toISOString();
 
@@ -87,7 +98,7 @@ async function verifyPayment(targetAmount, orderCreationTime = null, customMerch
 
     if (!headers) throw new Error('Sesi GoPay belum ada. Silakan login via browser di /login');
 
-    const merchantId = customMerchantId || process.env.GOPAY_MERCHANT_ID || '';
+    const merchantId = await getActiveMerchantId(customMerchantId);
     let rawTransactions;
 
     try {
@@ -283,5 +294,6 @@ module.exports = {
     mutationCache,
     autoLoginGojek,
     fetchCachedTransactions,
-    verifyPayment
+    verifyPayment,
+    getActiveMerchantId
 };

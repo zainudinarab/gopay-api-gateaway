@@ -1,15 +1,19 @@
 // Background Worker - Unclaimed Transactions Auto-Reconciler
 const db = require('../db');
 const sessionManager = require('../sessionManager');
-const { fetchCachedTransactions } = require('../services/gojekService');
+const { fetchCachedTransactions, getActiveMerchantId } = require('../services/gojekService');
 const { logActivity } = require('../services/loggerService');
 
 async function reconcileUnclaimedTransactions() {
     try {
-        // 1. Automatic Live Background Reconciliation directly from GoJek API
-        const headers = await sessionManager.getValidHeaders();
-        if (headers) {
-            const merchantId = process.env.GOPAY_MERCHANT_ID || '';
+        // 1. Automatic Live Background Reconciliation directly from GoJek API (Multi-Merchant Supported)
+        const merchants = await db.getAllMerchants();
+        const merchantList = (merchants && merchants.length > 0) ? merchants : [{ merchantId: null }];
+
+        for (const m of merchantList) {
+            const headers = await sessionManager.getValidHeaders();
+            if (!headers) continue;
+            const merchantId = m.merchantId || await getActiveMerchantId();
             let rawTransactions = [];
             try {
                 rawTransactions = await fetchCachedTransactions(headers, merchantId, true);
@@ -56,6 +60,8 @@ async function reconcileUnclaimedTransactions() {
                             await db.claimTransaction(txId, {
                                 order_id: tx.order_id,
                                 qrisId: targetOrder.qrisId,
+                                merchantId: merchantId,
+                                merchant_id: merchantId,
                                 amount: amt,
                                 payer_issuer: matched.payer_issuer,
                                 payment_type: matched.payment_type,

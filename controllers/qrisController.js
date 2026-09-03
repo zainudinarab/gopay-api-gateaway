@@ -23,7 +23,26 @@ const createQris = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Nominal minimal Rp 1' });
         }
 
-        const staticQR = await db.getStaticQris();
+        const merchantId = req.body?.merchant_id || req.query?.merchant_id || null;
+
+        // Check if merchant has active session
+        const allMerchants = await db.getAllMerchants();
+        let targetMerchant = null;
+        if (merchantId) {
+            targetMerchant = allMerchants.find(m => m.merchant_id === merchantId || m.merchantId === merchantId);
+        } else {
+            targetMerchant = allMerchants.find(m => m.isActive && m.hasSession) || allMerchants.find(m => m.hasSession);
+        }
+
+        if (!targetMerchant || !targetMerchant.hasSession) {
+            const mLabel = (targetMerchant && (targetMerchant.merchant_name || targetMerchant.merchantName)) || merchantId || 'Default';
+            return res.status(400).json({ 
+                success: false, 
+                message: `Gagal membuat QRIS: Merchant "${mLabel}" belum memiliki Sesi GoBiz Aktif. Silakan lakukan Login OTP pada tab "Sesi & Merchant" terlebih dahulu.` 
+            });
+        }
+
+        const staticQR = await db.getStaticQris(merchantId || targetMerchant.merchant_id);
         if (!staticQR) {
             return res.status(500).json({ success: false, message: 'GOPAY_STATIC_QRIS belum dikonfigurasi di Database atau .env' });
         }
@@ -51,6 +70,7 @@ const createQris = async (req, res) => {
         const newOrder = await db.saveOrder({
             qrisId,
             trxId,
+            merchantId,
             clientRefId,
             appId,
             webhookUrl,

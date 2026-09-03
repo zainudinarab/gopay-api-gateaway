@@ -9,6 +9,7 @@ const webRoutes = require('./routes/webRoutes');
 const { startWebhookWorker } = require('./workers/webhookWorker');
 const { startReconcilerWorker } = require('./workers/reconcilerWorker');
 const { startSessionWorker } = require('./workers/sessionWorker');
+const { isRedisConnected } = require('./redis');
 const { logActivity } = require('./services/loggerService');
 
 const PORT = process.env.PORT || 3000;
