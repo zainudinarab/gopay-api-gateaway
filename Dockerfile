@@ -1,18 +1,16 @@
-FROM node:20-alpine
+FROM node:22-slim
 
 WORKDIR /app
 
-# Install build dependencies for node-gyp & better-sqlite3 + python symlink
-RUN apk add --no-cache python3 make g++ sqlite-dev && \
-    ln -sf /usr/bin/python3 /usr/bin/python
+# Install build dependencies for node-gyp & better-sqlite3 di Debian Slim
+RUN apt-get update && apt-get install -y python3 make g++ sqlite3 libsqlite3-dev && \
+    rm -rf /var/lib/apt/lists/*
 
 ENV PYTHON=/usr/bin/python3
 
 COPY package*.json ./
 
-# Set disturl ke Official Node.js CDN agar node-gyp tidak ETIMEDOUT saat mengambil header
-RUN npm config set disturl https://nodejs.org/dist && \
-    npm install --omit=dev
+RUN npm install --omit=dev
 
 COPY . .
 
