@@ -10,7 +10,7 @@ ENV PYTHON=/usr/bin/python3
 
 COPY package*.json ./
 
-RUN npm install --omit=dev
+RUN npm config set python /usr/bin/python3 && npm install --omit=dev
 
 COPY . .
 
