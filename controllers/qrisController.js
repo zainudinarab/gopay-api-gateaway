@@ -98,11 +98,9 @@ const createQris = async (req, res) => {
                 amount: finalAmount,
                 qris_string: dynamicQRString,
                 qris_image_url: `${baseUrl}/qr/${newOrder.qrisId}.png`,
-                qris_image_base64: qrisImageBase64,
                 checkout_url: `${baseUrl}/qr/${newOrder.qrisId}`,
                 webhook_url: webhookUrl,
-                expires_at: expiresAt.toISOString(),
-                expires_in_hours: parseFloat(expiresHoursInput)
+                expires_at: expiresAt.toISOString()
             }
         });
     } catch (err) {
