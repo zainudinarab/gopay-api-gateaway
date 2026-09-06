@@ -1521,6 +1521,21 @@ module.exports = {
         return client.appSecret === String(appSecret).trim();
     },
 
+    async resolveOrderWebhookUrl(order) {
+        if (!order) return null;
+        if (order.webhookUrl || order.webhook_url) {
+            return order.webhookUrl || order.webhook_url;
+        }
+        const appId = order.appId || order.app_id;
+        if (appId) {
+            const clientData = await this.getApiClient(appId);
+            if (clientData && (clientData.webhook_url || clientData.webhookUrl)) {
+                return clientData.webhook_url || clientData.webhookUrl;
+            }
+        }
+        return null;
+    },
+
 
 
     isPostgres,

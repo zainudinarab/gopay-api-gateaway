@@ -63,11 +63,12 @@ const manualClaimOrder = async (req, res) => {
 
     await db.updateOrderStatus(order.qrisId, 'PAID', matched);
 
-    if (order.webhookUrl) {
+    const resolvedWebhookUrl = await db.resolveOrderWebhookUrl(order);
+    if (resolvedWebhookUrl) {
         await db.enqueueWebhook({
             qrisId: order.qrisId,
             clientRefId: order.clientRefId,
-            webhookUrl: order.webhookUrl,
+            webhookUrl: resolvedWebhookUrl,
             payload: {
                 event: 'payment.success',
                 qris_id: order.qrisId,

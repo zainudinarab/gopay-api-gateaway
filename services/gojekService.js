@@ -203,11 +203,12 @@ async function verifyPayment(targetAmount, orderCreationTime = null, customMerch
                     await db.updateOrderStatus(targetOwnerQrisId, 'PAID', matched);
 
                     const ownerOrder = await db.getOrder(targetOwnerQrisId);
-                    if (ownerOrder && ownerOrder.webhookUrl && (ownerOrder.webhookStatus === 'PENDING' || ownerOrder.webhookStatus === 'NONE')) {
+                    const resolvedWebhookUrl = await db.resolveOrderWebhookUrl(ownerOrder);
+                    if (ownerOrder && resolvedWebhookUrl && (ownerOrder.webhookStatus === 'PENDING' || ownerOrder.webhookStatus === 'NONE')) {
                         await db.enqueueWebhook({
                             qrisId: targetOwnerQrisId,
                             clientRefId: ownerOrder.clientRefId,
-                            webhookUrl: ownerOrder.webhookUrl,
+                            webhookUrl: resolvedWebhookUrl,
                             payload: {
                                 event: 'payment.success',
                                 qris_id: ownerOrder.qrisId,
@@ -259,11 +260,12 @@ async function verifyPayment(targetAmount, orderCreationTime = null, customMerch
                     const realQrisId = targetOrder ? targetOrder.qrisId : existingClaim.qrisId;
                     await db.updateOrderStatus(realQrisId, 'PAID', matched);
                     
-                    if (targetOrder && targetOrder.webhookUrl && (targetOrder.webhookStatus === 'PENDING' || targetOrder.webhookStatus === 'NONE')) {
+                    const resolvedWebhookUrl = await db.resolveOrderWebhookUrl(targetOrder);
+                    if (targetOrder && resolvedWebhookUrl && (targetOrder.webhookStatus === 'PENDING' || targetOrder.webhookStatus === 'NONE')) {
                         await db.enqueueWebhook({
                             qrisId: targetOrder.qrisId,
                             clientRefId: targetOrder.clientRefId,
-                            webhookUrl: targetOrder.webhookUrl,
+                            webhookUrl: resolvedWebhookUrl,
                             payload: {
                                 event: 'payment.success',
                                 qris_id: targetOrder.qrisId,

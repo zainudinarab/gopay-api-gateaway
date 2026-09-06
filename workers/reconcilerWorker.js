@@ -69,11 +69,12 @@ async function reconcileUnclaimedTransactions() {
                             });
                             await db.updateOrderStatus(targetOrder.qrisId, 'PAID', matched);
 
-                            if (targetOrder.webhookUrl && (targetOrder.webhookStatus === 'PENDING' || targetOrder.webhookStatus === 'NONE')) {
+                            const resolvedWebhookUrl = await db.resolveOrderWebhookUrl(targetOrder);
+                            if (resolvedWebhookUrl && (targetOrder.webhookStatus === 'PENDING' || targetOrder.webhookStatus === 'NONE')) {
                                 await db.enqueueWebhook({
                                     qrisId: targetOrder.qrisId,
                                     clientRefId: targetOrder.clientRefId,
-                                    webhookUrl: targetOrder.webhookUrl,
+                                    webhookUrl: resolvedWebhookUrl,
                                     payload: {
                                         event: 'payment.success',
                                         qris_id: targetOrder.qrisId,
@@ -132,11 +133,12 @@ async function reconcileUnclaimedTransactions() {
                 await db.updateClaimedTransactionOwner(tx.transaction_id, targetOrder.qrisId);
                 await db.updateOrderStatus(targetOrder.qrisId, 'PAID', matched);
 
-                if (targetOrder.webhookUrl && (targetOrder.webhookStatus === 'PENDING' || targetOrder.webhookStatus === 'NONE')) {
+                const resolvedWebhookUrl = await db.resolveOrderWebhookUrl(targetOrder);
+                if (resolvedWebhookUrl && (targetOrder.webhookStatus === 'PENDING' || targetOrder.webhookStatus === 'NONE')) {
                     await db.enqueueWebhook({
                         qrisId: targetOrder.qrisId,
                         clientRefId: targetOrder.clientRefId,
-                        webhookUrl: targetOrder.webhookUrl,
+                        webhookUrl: resolvedWebhookUrl,
                         payload: {
                             event: 'payment.success',
                             qris_id: targetOrder.qrisId,
