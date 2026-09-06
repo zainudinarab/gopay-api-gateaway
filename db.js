@@ -418,6 +418,24 @@ module.exports = {
         }));
     },
 
+    async hasPendingOrders() {
+        const now = Date.now();
+        if (isPostgres) {
+            try {
+                const res = await pgPool.query(`SELECT COUNT(*) FROM qris_orders WHERE status = 'PENDING' AND expires_at > $1`, [now]);
+                return parseInt(res.rows[0].count, 10) > 0;
+            } catch (e) {
+                return true;
+            }
+        }
+        try {
+            const row = sqliteDb.prepare(`SELECT COUNT(*) as count FROM qris_orders WHERE status = 'PENDING' AND expires_at > ?`).get(now);
+            return row ? row.count > 0 : true;
+        } catch (e) {
+            return true;
+        }
+    },
+
     async getAllOrders(limit = 100) {
         if (isPostgres) {
             try {

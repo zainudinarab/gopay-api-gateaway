@@ -6,6 +6,10 @@ const { logActivity } = require('../services/loggerService');
 
 async function reconcileUnclaimedTransactions() {
     try {
+        // Smart Guard: Only poll GoJek API if there are active PENDING QRIS orders in database
+        const hasPending = await db.hasPendingOrders();
+        if (!hasPending) return;
+
         // 1. Automatic Live Background Reconciliation directly from GoJek API (Multi-Merchant Supported)
         const merchants = await db.getAllMerchants();
         const merchantList = (merchants && merchants.length > 0) ? merchants : [{ merchantId: null }];
