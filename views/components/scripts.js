@@ -1366,19 +1366,20 @@ function renderScripts() {
         async function loadWebhooksTable() {
             const tbody = document.getElementById('tbody-webhooks');
             if (!tbody) return;
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Memuat antrian webhook...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Memuat antrian webhook...</td></tr>';
             try {
                 const res = await fetch('/api/webhooks?limit=50&api_key=' + encodeURIComponent(adminPass));
                 const data = await res.json();
                 if (data.success && data.data) {
                     if (data.data.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Belum ada antrian webhook.</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Belum ada antrian webhook.</td></tr>';
                         return;
                     }
                     tbody.innerHTML = data.data.map(function(w) {
                         var statusTag = w.status === 'SUCCESS' ? '<span class="tag tag-success">🟢 SUCCESS</span>' : (w.status === 'FAILED' ? '<span class="tag tag-failed">🔴 FAILED</span>' : '<span class="tag tag-pending">🟡 PENDING</span>');
                         var fmtDate = new Date(w.createdAt).toLocaleString('id-ID');
                         var refText = w.clientRefId ? '<small style="color:var(--text-muted);">(' + w.clientRefId + ')</small>' : '';
+                        var resendBtn = '<button onclick="resendWebhook(' + w.id + ')" class="px-2.5 py-1 rounded-lg bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/30 text-sky-400 text-xs font-bold transition-colors">🔁 Kirim Ulang</button>';
                         return '<tr>' +
                             '<td>#' + w.id + '</td>' +
                             '<td><strong>' + w.qrisId + '</strong> ' + refText + '</td>' +
@@ -1387,11 +1388,33 @@ function renderScripts() {
                             '<td>' + statusTag + '</td>' +
                             '<td style="color:var(--accent-red); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">' + (w.lastError || '-') + '</td>' +
                             '<td>' + fmtDate + '</td>' +
+                            '<td>' + resendBtn + '</td>' +
                         '</tr>';
                     }).join('');
                 }
             } catch (e) {
-                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--accent-red);">Gagal memuat webhooks: ' + e.message + '</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--accent-red);">Gagal memuat webhooks: ' + e.message + '</td></tr>';
+            }
+        }
+
+        async function resendWebhook(id) {
+            if (!confirm('Kirim ulang notifikasi webhook #' + id + '?')) return;
+            try {
+                const res = await fetch('/api/webhooks/resend?api_key=' + encodeURIComponent(adminPass), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: id })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast('Sukses', data.message || 'Webhook berhasil diantrikan ulang!', 'success');
+                    loadWebhooksTable();
+                    if (typeof renderOrdersPage === 'function') renderOrdersPage();
+                } else {
+                    showToast('Gagal', data.message || 'Gagal meresend webhook', 'error');
+                }
+            } catch (e) {
+                showToast('Error', e.message, 'error');
             }
         }
 

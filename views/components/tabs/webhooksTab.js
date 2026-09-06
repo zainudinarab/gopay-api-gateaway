@@ -22,10 +22,11 @@ function renderWebhooksTab() {
                             <th>Status Delivery</th>
                             <th>Error Log</th>
                             <th>Waktu</th>
+                            <th>Aksi</th>
                         </tr>
                     </thead>
                     <tbody id="tbody-webhooks">
-                        <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Memuat antrian webhook...</td></tr>
+                        <tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Memuat antrian webhook...</td></tr>
                     </tbody>
                 </table>
             </div>

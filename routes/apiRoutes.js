@@ -39,6 +39,8 @@ router.post('/check-payment', apiKeyAuth, transactionController.checkPayment);
 
 // Webhook & Logs Monitoring Endpoints
 router.get('/webhooks', apiKeyAuth, webhookController.getAllWebhooks);
+router.post('/webhooks/resend', apiKeyAuth, webhookController.resendWebhook);
+router.post('/webhooks/resend/:id', apiKeyAuth, webhookController.resendWebhook);
 router.get('/logs', apiKeyAuth, (req, res) => res.json({ success: true, logs: activityLogs }));
 
 // Multi-Merchant Management Endpoints

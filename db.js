@@ -791,6 +791,87 @@ module.exports = {
         }
     },
 
+    async getWebhookById(id) {
+        if (!id) return null;
+        if (isPostgres) {
+            try {
+                const res = await pgPool.query(`SELECT * FROM webhook_queue WHERE id = $1`, [id]);
+                if (res.rows.length === 0) return null;
+                const r = res.rows[0];
+                return {
+                    id: r.id,
+                    qrisId: r.qris_id,
+                    clientRefId: r.client_ref_id,
+                    webhookUrl: r.webhook_url,
+                    payload: typeof r.payload === 'string' ? JSON.parse(r.payload) : r.payload,
+                    attempts: parseInt(r.attempts, 10),
+                    maxAttempts: parseInt(r.max_attempts, 10),
+                    status: r.status,
+                    lastError: r.last_error,
+                    createdAt: new Date(parseInt(r.created_at, 10)),
+                    nextAttemptAt: new Date(parseInt(r.next_attempt_at, 10))
+                };
+            } catch (e) {
+                console.error('[PG GET WEBHOOK BY ID ERROR]:', e.message);
+                return null;
+            }
+        }
+        try {
+            const r = sqliteDb.prepare(`SELECT * FROM webhook_queue WHERE id = ?`).get(id);
+            if (!r) return null;
+            return {
+                id: r.id,
+                qrisId: r.qris_id,
+                clientRefId: r.client_ref_id,
+                webhookUrl: r.webhook_url,
+                payload: typeof r.payload === 'string' ? JSON.parse(r.payload) : r.payload,
+                attempts: r.attempts,
+                maxAttempts: r.max_attempts,
+                status: r.status,
+                lastError: r.last_error,
+                createdAt: new Date(r.created_at),
+                nextAttemptAt: new Date(r.next_attempt_at)
+            };
+        } catch (e) {
+            return null;
+        }
+    },
+
+    async retryWebhook(id) {
+        const item = await this.getWebhookById(id);
+        if (!item) return null;
+
+        const order = await this.getOrder(item.qrisId);
+        const freshUrl = (order ? await this.resolveOrderWebhookUrl(order) : null) || item.webhookUrl;
+        const now = Date.now();
+
+        if (isPostgres) {
+            try {
+                await pgPool.query(`
+                    UPDATE webhook_queue
+                    SET attempts = 0, status = 'PENDING', webhook_url = $1, next_attempt_at = $2, last_error = NULL
+                    WHERE id = $3
+                `, [freshUrl, now, id]);
+            } catch (e) {
+                console.error('[PG RETRY WEBHOOK ERROR]:', e.message);
+            }
+        } else {
+            try {
+                sqliteDb.prepare(`
+                    UPDATE webhook_queue
+                    SET attempts = 0, status = 'PENDING', webhook_url = ?, next_attempt_at = ?, last_error = NULL
+                    WHERE id = ?
+                `).run(freshUrl, now, id);
+            } catch (e) {}
+        }
+
+        if (item.qrisId) {
+            await this.updateOrderWebhookStatus(item.qrisId, 'QUEUED');
+        }
+
+        return await this.getWebhookById(id);
+    },
+
     async getAllWebhooks(limit = 50) {
         if (isPostgres) {
             try {
