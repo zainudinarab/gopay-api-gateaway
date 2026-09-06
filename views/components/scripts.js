@@ -299,7 +299,7 @@ function renderScripts() {
 
             tbody.innerHTML = pageItems.map(function(o) {
                 var statusTag = o.status === 'PAID' ? '<span class="tag tag-paid">🟢 PAID</span>' : (o.status === 'EXPIRED' ? '<span class="tag tag-expired">🔴 EXPIRED</span>' : '<span class="tag tag-pending">🟡 PENDING</span>');
-                var whTag = o.webhookStatus === 'SUCCESS' ? '<span class="tag tag-success">🟢 SUCCESS</span>' : (o.webhookStatus === 'FAILED' ? '<span class="tag tag-failed">🔴 FAILED</span>' : (o.webhookStatus === 'QUEUED' || o.webhookStatus === 'PENDING' ? '<span class="tag tag-pending">🟡 QUEUED</span>' : '<span class="text-slate-500">-</span>'));
+                var whTag = o.webhookStatus === 'SUCCESS' ? '<span class="tag tag-success">🟢 SUCCESS</span>' : (o.webhookStatus === 'FAILED' ? '<span class="tag tag-failed">🔴 FAILED</span>' : (o.webhookStatus === 'QUEUED' ? '<span class="tag tag-pending">🟡 QUEUED</span>' : '<span class="text-slate-500">-</span>'));
                 var fmtAmount = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(o.amount);
                 var fmtDate = new Date(o.createdAt).toLocaleString('id-ID');
                 var claimBtn = (o.status !== 'PAID') 
@@ -1867,7 +1867,7 @@ function renderScripts() {
                         const recent5 = orders.slice(0, 5);
                         tbodyRecent.innerHTML = recent5.map(function(o) {
                             var statusTag = o.status === 'PAID' ? '<span class="tag tag-paid">🟢 PAID</span>' : (o.status === 'EXPIRED' ? '<span class="tag tag-expired">🔴 EXPIRED</span>' : '<span class="tag tag-pending">🟡 PENDING</span>');
-                            var whTag = o.webhookStatus === 'SUCCESS' ? '<span class="tag tag-success">🟢 SUCCESS</span>' : (o.webhookStatus === 'FAILED' ? '<span class="tag tag-failed">🔴 FAILED</span>' : '<span class="tag tag-pending">🟡 QUEUED</span>');
+                            var whTag = o.webhookStatus === 'SUCCESS' ? '<span class="tag tag-success">🟢 SUCCESS</span>' : (o.webhookStatus === 'FAILED' ? '<span class="tag tag-failed">🔴 FAILED</span>' : (o.webhookStatus === 'QUEUED' ? '<span class="tag tag-pending">🟡 QUEUED</span>' : '<span class="text-slate-500">-</span>'));
                             var fmtAmount = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(o.amount);
                             var fmtDate = new Date(o.createdAt).toLocaleString('id-ID');
                             return '<tr class="hover:bg-slate-800/40 transition-colors border-b border-slate-800/60">' +

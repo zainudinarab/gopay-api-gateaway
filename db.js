@@ -64,7 +64,7 @@ if (isPostgres) {
                         merchant_id VARCHAR(100),
                         client_ref_id VARCHAR(255),
                         webhook_url TEXT,
-                        webhook_status VARCHAR(50) DEFAULT 'PENDING',
+                        webhook_status VARCHAR(50) DEFAULT 'NONE',
                         amount BIGINT NOT NULL,
                         base_amount BIGINT,
                         unique_code INT DEFAULT 0,
@@ -197,7 +197,7 @@ if (isPostgres) {
             merchant_id TEXT,
             client_ref_id TEXT,
             webhook_url TEXT,
-            webhook_status TEXT DEFAULT 'PENDING',
+            webhook_status TEXT DEFAULT 'NONE',
             amount INTEGER NOT NULL,
             base_amount INTEGER,
             unique_code INTEGER DEFAULT 0,
@@ -470,10 +470,10 @@ module.exports = {
                 await pgPool.query(`
                     INSERT INTO qris_orders (qris_id, trx_id, merchant_id, client_ref_id, app_id, webhook_url, webhook_status, amount, base_amount, unique_code, qris_code, status, created_at, expires_at)
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-                    ON CONFLICT (qris_id) DO UPDATE SET status = EXCLUDED.status, webhook_status = EXCLUDED.webhook_status, merchant_id = EXCLUDED.merchant_id
+                    ON CONFLICT (qris_id) DO UPDATE SET status = EXCLUDED.status, merchant_id = EXCLUDED.merchant_id
                 `, [
                     qrisId, order.trxId, merchantId, order.clientRefId || order.refId || null, order.appId || 'default',
-                    order.webhookUrl || null, order.webhookUrl ? 'PENDING' : 'NONE', order.amount,
+                    order.webhookUrl || null, 'NONE', order.amount,
                     order.baseAmount || order.amount, order.uniqueCode || 0, qrisCode, order.status || 'PENDING',
                     createdAt, expiresAt
                 ]);
@@ -488,7 +488,7 @@ module.exports = {
                 clientRefId: order.clientRefId || order.refId || null,
                 appId: order.appId || 'default',
                 webhookUrl: order.webhookUrl || null,
-                webhookStatus: order.webhookUrl ? 'PENDING' : 'NONE',
+                webhookStatus: 'NONE',
                 amount: order.amount,
                 baseAmount: order.baseAmount || order.amount,
                 uniqueCode: order.uniqueCode || 0,
