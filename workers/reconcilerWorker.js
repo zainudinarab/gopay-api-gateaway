@@ -69,25 +69,26 @@ async function reconcileUnclaimedTransactions() {
                             });
                             await db.updateOrderStatus(targetOrder.qrisId, 'PAID', matched);
 
-                            const resolvedWebhookUrl = await db.resolveOrderWebhookUrl(targetOrder);
-                            if (resolvedWebhookUrl && (targetOrder.webhookStatus === 'PENDING' || targetOrder.webhookStatus === 'NONE')) {
+                            const ownerOrder = await db.getOrder(targetOrder.qrisId);
+                            const resolvedWebhookUrl = await db.resolveOrderWebhookUrl(ownerOrder);
+                            if (ownerOrder && resolvedWebhookUrl && (ownerOrder.webhookStatus === 'PENDING' || ownerOrder.webhookStatus === 'NONE')) {
                                 await db.enqueueWebhook({
-                                    qrisId: targetOrder.qrisId,
-                                    clientRefId: targetOrder.clientRefId,
+                                    qrisId: ownerOrder.qrisId,
+                                    clientRefId: ownerOrder.clientRefId,
                                     webhookUrl: resolvedWebhookUrl,
                                     payload: {
                                         event: 'payment.success',
-                                        qris_id: targetOrder.qrisId,
-                                        trx_id: targetOrder.trxId,
-                                        client_ref_id: targetOrder.clientRefId,
+                                        qris_id: ownerOrder.qrisId,
+                                        trx_id: ownerOrder.trxId,
+                                        client_ref_id: ownerOrder.clientRefId,
                                         status: 'PAID',
-                                        amount: targetOrder.amount,
-                                        base_amount: targetOrder.baseAmount,
-                                        unique_code: targetOrder.uniqueCode,
+                                        amount: ownerOrder.amount,
+                                        base_amount: ownerOrder.baseAmount,
+                                        unique_code: ownerOrder.uniqueCode,
                                         transaction: matched
                                     }
                                 });
-                                await db.updateOrderWebhookStatus(targetOrder.qrisId, 'QUEUED');
+                                await db.updateOrderWebhookStatus(ownerOrder.qrisId, 'QUEUED');
                             }
                             logActivity('SUCCESS', `[BACKGROUND LIVE RECONCILER] TRX ${txId} (Rp ${amt}) otomatis dicocokkan dengan QRIS ID ${targetOrder.qrisId}`);
                         }
@@ -133,25 +134,26 @@ async function reconcileUnclaimedTransactions() {
                 await db.updateClaimedTransactionOwner(tx.transaction_id, targetOrder.qrisId);
                 await db.updateOrderStatus(targetOrder.qrisId, 'PAID', matched);
 
-                const resolvedWebhookUrl = await db.resolveOrderWebhookUrl(targetOrder);
-                if (resolvedWebhookUrl && (targetOrder.webhookStatus === 'PENDING' || targetOrder.webhookStatus === 'NONE')) {
+                const ownerOrder = await db.getOrder(targetOrder.qrisId);
+                const resolvedWebhookUrl = await db.resolveOrderWebhookUrl(ownerOrder);
+                if (ownerOrder && resolvedWebhookUrl && (ownerOrder.webhookStatus === 'PENDING' || ownerOrder.webhookStatus === 'NONE')) {
                     await db.enqueueWebhook({
-                        qrisId: targetOrder.qrisId,
-                        clientRefId: targetOrder.clientRefId,
+                        qrisId: ownerOrder.qrisId,
+                        clientRefId: ownerOrder.clientRefId,
                         webhookUrl: resolvedWebhookUrl,
                         payload: {
                             event: 'payment.success',
-                            qris_id: targetOrder.qrisId,
-                            trx_id: targetOrder.trxId,
-                            client_ref_id: targetOrder.clientRefId,
+                            qris_id: ownerOrder.qrisId,
+                            trx_id: ownerOrder.trxId,
+                            client_ref_id: ownerOrder.clientRefId,
                             status: 'PAID',
-                            amount: targetOrder.amount,
-                            base_amount: targetOrder.baseAmount,
-                            unique_code: targetOrder.uniqueCode,
+                            amount: ownerOrder.amount,
+                            base_amount: ownerOrder.baseAmount,
+                            unique_code: ownerOrder.uniqueCode,
                             transaction: matched
                         }
                     });
-                    await db.updateOrderWebhookStatus(targetOrder.qrisId, 'QUEUED');
+                    await db.updateOrderWebhookStatus(ownerOrder.qrisId, 'QUEUED');
                 }
 
                 logActivity('SUCCESS', `[AUTO-RECONCILER] Transaksi ${tx.transaction_id} (Rp ${tx.amount}) berhasil dicocokkan & diklaim oleh QRIS ID ${targetOrder.qrisId}`);
