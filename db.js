@@ -126,11 +126,11 @@ if (isPostgres) {
                         created_at BIGINT NOT NULL,
                         updated_at BIGINT NOT NULL
                     );
-
-                    try {
-                        await client.query(`ALTER TABLE api_clients ADD COLUMN IF NOT EXISTS webhook_url TEXT;`);
-                    } catch (mErr) {}
                 `);
+
+                try {
+                    await client.query(`ALTER TABLE api_clients ADD COLUMN IF NOT EXISTS webhook_url TEXT;`);
+                } catch (mErr) {}
 
                 try {
                     const defaultSecret = (process.env.APP_SECRET || 'secret123').trim();
