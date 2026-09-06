@@ -68,6 +68,7 @@ router.post('/clients', adminPassAuth, async (req, res) => {
     const appId = req.body?.app_id || req.body?.appId;
     const appSecret = req.body?.app_secret || req.body?.appSecret;
     const clientName = req.body?.client_name || req.body?.clientName || appId;
+    const webhookUrl = req.body?.webhook_url || req.body?.webhookUrl || '';
     const isActive = req.body?.is_active !== undefined ? req.body.is_active : true;
 
     if (!appId || !String(appId).trim()) {
@@ -77,7 +78,7 @@ router.post('/clients', adminPassAuth, async (req, res) => {
         return res.status(400).json({ success: false, message: 'App Secret (Password API) wajib diisi' });
     }
 
-    const ok = await db.saveApiClient(appId, appSecret, clientName, isActive);
+    const ok = await db.saveApiClient(appId, appSecret, clientName, isActive, webhookUrl);
     if (ok) {
         logActivity('INFO', `[API CLIENTS] Client API '${appId}' (${clientName}) berhasil disimpan di database`);
         const clients = await db.getAllApiClients();

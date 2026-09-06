@@ -11,8 +11,15 @@ const createQris = async (req, res) => {
         let amountInput = req.body?.amount || req.query?.amount;
         const clientRefId = req.body?.client_ref_id || req.body?.ref_id || req.query?.client_ref_id || req.query?.ref_id || null;
         const appId = req.appId || req.body?.app_id || req.query?.app_id || req.headers['x-app-id'];
-        const webhookUrl = req.body?.webhook_url || req.body?.callback_url || req.query?.webhook_url || req.query?.callback_url || null;
+        let webhookUrl = req.body?.webhook_url || req.body?.callback_url || req.query?.webhook_url || req.query?.callback_url || null;
         const expiresHoursInput = req.body?.expires_in_hours || req.query?.expires_in_hours || 12;
+
+        if (!webhookUrl && appId) {
+            const clientData = await db.getApiClient(appId);
+            if (clientData && (clientData.webhook_url || clientData.webhookUrl)) {
+                webhookUrl = clientData.webhook_url || clientData.webhookUrl;
+            }
+        }
 
         if (!amountInput || isNaN(amountInput)) {
             return res.status(400).json({ success: false, message: 'Nominal pembayaran (amount) wajib diisi' });

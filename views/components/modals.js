@@ -260,6 +260,13 @@ function renderModals() {
                     <input type="text" id="modal-client-name" placeholder="Contoh: Website Utama Toko ABC" style="width:100%; padding:10px 14px; background:#020617; border:1px solid #1e293b; border-radius:10px; color:#f8fafc; font-size:13px; outline:none;">
                 </div>
 
+                <!-- Default Webhook Callback URL -->
+                <div>
+                    <label style="display:block; font-size:11px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">Default Webhook Callback URL (Opsional)</label>
+                    <input type="url" id="modal-client-webhook-url" placeholder="Contoh: http://30.30.2.53:8080/api/v1/webhooks/gopay" style="width:100%; padding:10px 14px; background:#020617; border:1px solid #1e293b; border-radius:10px; color:#38bdf8; font-family:'JetBrains Mono',monospace; font-size:12.5px; outline:none;">
+                    <div style="font-size:11px; color:#64748b; margin-top:4px;">💡 URL fallback jika saat request create QRIS tidak mengirimkan webhook_url khusus.</div>
+                </div>
+
                 <!-- Status Aktif / Nonaktif -->
                 <div>
                     <label style="display:block; font-size:11px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">Status Otorisasi</label>

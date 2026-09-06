@@ -868,6 +868,7 @@ function renderScripts() {
                         '<th class="px-4 py-3">Nama Aplikasi / Deskripsi</th>' +
                         '<th class="px-4 py-3">App-ID (Username API)</th>' +
                         '<th class="px-4 py-3">App-Secret (Password API)</th>' +
+                        '<th class="px-4 py-3">Default Webhook URL</th>' +
                         '<th class="px-4 py-3">Status Otorisasi</th>' +
                         '<th class="px-4 py-3 text-right">Aksi</th>' +
                     '</tr></thead><tbody class="divide-y divide-slate-800/60">';
@@ -876,19 +877,25 @@ function renderScripts() {
                     const safeId = (c.app_id || c.appId || '').replace(/"/g, '&quot;');
                     const safeSecret = (c.app_secret || c.appSecret || '').replace(/"/g, '&quot;');
                     const safeName = (c.client_name || c.clientName || safeId).replace(/"/g, '&quot;');
+                    const safeWebhook = (c.webhook_url || c.webhookUrl || '').replace(/"/g, '&quot;');
                     const isAct = Boolean(c.is_active || c.isActive);
 
                     const statusBadge = isAct
                         ? '<span class="px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold">🟢 Aktif</span>'
                         : '<span class="px-2.5 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-400 text-xs font-bold">🔴 Non-Aktif</span>';
 
+                    const webhookDisplay = (c.webhook_url || c.webhookUrl)
+                        ? '<code class="font-mono text-sky-300 text-xs bg-slate-950 px-2 py-0.5 rounded border border-slate-800 break-all">' + (c.webhook_url || c.webhookUrl) + '</code>'
+                        : '<span class="text-slate-500 text-xs italic">-</span>';
+
                     html += '<tr class="hover:bg-slate-800/40 transition-colors border-b border-slate-800/60">' +
                         '<td class="px-4 py-3.5"><strong class="font-bold text-white">📱 ' + (c.client_name || c.app_id) + '</strong></td>' +
                         '<td class="px-4 py-3.5"><code class="font-mono text-sky-400 font-bold text-xs bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">' + (c.app_id) + '</code></td>' +
                         '<td class="px-4 py-3.5"><code class="font-mono text-amber-300 font-bold text-xs bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">' + (c.app_secret) + '</code></td>' +
+                        '<td class="px-4 py-3.5">' + webhookDisplay + '</td>' +
                         '<td class="px-4 py-3.5">' + statusBadge + '</td>' +
                         '<td class="px-4 py-3.5 text-right flex items-center justify-end gap-1.5">' +
-                            '<button class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-medium transition-colors" data-id="' + safeId + '" data-secret="' + safeSecret + '" data-name="' + safeName + '" data-active="' + isAct + '" onclick="handleApiClientEditClick(this)">✏️ Edit</button>' +
+                            '<button class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-medium transition-colors" data-id="' + safeId + '" data-secret="' + safeSecret + '" data-name="' + safeName + '" data-webhook="' + safeWebhook + '" data-active="' + isAct + '" onclick="handleApiClientEditClick(this)">✏️ Edit</button>' +
                             '<button class="px-2 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-400 text-xs transition-colors" data-id="' + safeId + '" onclick="handleApiClientDeleteClick(this)">🗑️</button>' +
                         '</td>' +
                     '</tr>';
@@ -903,7 +910,7 @@ function renderScripts() {
 
         let _editingApiClientId = null;
 
-        function openAddApiClientModal(appId = null, appSecret = null, clientName = null, isActive = true) {
+        function openAddApiClientModal(appId = null, appSecret = null, clientName = null, isActive = true, webhookUrl = null) {
             const modal = document.getElementById('modal-add-api-client');
             if (!modal) return;
             modal.style.display = 'flex';
@@ -914,6 +921,7 @@ function renderScripts() {
             const idInp = document.getElementById('modal-client-app-id');
             const secretInp = document.getElementById('modal-client-app-secret');
             const nameInp = document.getElementById('modal-client-name');
+            const webhookInp = document.getElementById('modal-client-webhook-url');
             const statusSel = document.getElementById('modal-client-status');
 
             if (titleEl) {
@@ -926,6 +934,7 @@ function renderScripts() {
             }
             if (secretInp) secretInp.value = appSecret || '';
             if (nameInp) nameInp.value = clientName || '';
+            if (webhookInp) webhookInp.value = webhookUrl || '';
             if (statusSel) statusSel.value = isActive ? 'true' : 'false';
         }
 
@@ -939,11 +948,13 @@ function renderScripts() {
             const idInp = document.getElementById('modal-client-app-id');
             const secretInp = document.getElementById('modal-client-app-secret');
             const nameInp = document.getElementById('modal-client-name');
+            const webhookInp = document.getElementById('modal-client-webhook-url');
             const statusSel = document.getElementById('modal-client-status');
 
             const appId = _editingApiClientId || idInp?.value?.trim();
             const appSecret = secretInp?.value?.trim();
             const clientName = nameInp?.value?.trim() || appId;
+            const webhookUrl = webhookInp?.value?.trim() || '';
             const isActive = statusSel?.value === 'true';
 
             if (!appId) {
@@ -959,7 +970,7 @@ function renderScripts() {
                 const res = await fetch('/api/clients', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPass },
-                    body: JSON.stringify({ app_id: appId, app_secret: appSecret, client_name: clientName, is_active: isActive })
+                    body: JSON.stringify({ app_id: appId, app_secret: appSecret, client_name: clientName, webhook_url: webhookUrl, is_active: isActive })
                 }).then(r => r.json());
 
                 if (res.success) {
@@ -978,8 +989,9 @@ function renderScripts() {
             const id = btn.getAttribute('data-id');
             const secret = btn.getAttribute('data-secret');
             const name = btn.getAttribute('data-name');
+            const webhook = btn.getAttribute('data-webhook');
             const active = btn.getAttribute('data-active') === 'true';
-            openAddApiClientModal(id, secret, name, active);
+            openAddApiClientModal(id, secret, name, active, webhook);
         }
 
         let _targetDeleteApiClientId = null;

@@ -121,10 +121,15 @@ if (isPostgres) {
                         app_id VARCHAR(100) PRIMARY KEY,
                         app_secret VARCHAR(255) NOT NULL,
                         client_name VARCHAR(255),
+                        webhook_url TEXT,
                         is_active BOOLEAN DEFAULT TRUE,
                         created_at BIGINT NOT NULL,
                         updated_at BIGINT NOT NULL
                     );
+
+                    try {
+                        await client.query(`ALTER TABLE api_clients ADD COLUMN IF NOT EXISTS webhook_url TEXT;`);
+                    } catch (mErr) {}
                 `);
 
                 try {
@@ -249,11 +254,16 @@ if (isPostgres) {
             app_id TEXT PRIMARY KEY,
             app_secret TEXT NOT NULL,
             client_name TEXT,
+            webhook_url TEXT,
             is_active INTEGER DEFAULT 1,
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL
         );
     `);
+
+    try {
+        sqliteDb.exec(`ALTER TABLE api_clients ADD COLUMN webhook_url TEXT;`);
+    } catch (mErr) {}
 
     try {
         const defaultSecret = (process.env.APP_SECRET || 'secret123').trim();
@@ -1364,6 +1374,8 @@ module.exports = {
             app_secret: r.app_secret,
             clientName: r.client_name || r.app_id,
             client_name: r.client_name || r.app_id,
+            webhookUrl: r.webhook_url || '',
+            webhook_url: r.webhook_url || '',
             isActive: Boolean(r.is_active),
             is_active: Boolean(r.is_active),
             createdAt: parseInt(r.created_at, 10),
@@ -1404,6 +1416,8 @@ module.exports = {
             app_secret: r.app_secret,
             clientName: r.client_name || r.app_id,
             client_name: r.client_name || r.app_id,
+            webhookUrl: r.webhook_url || '',
+            webhook_url: r.webhook_url || '',
             isActive: Boolean(r.is_active),
             is_active: Boolean(r.is_active)
         };
@@ -1414,11 +1428,12 @@ module.exports = {
         return clientData;
     },
 
-    async saveApiClient(appId, appSecret, clientName = '', isActive = true) {
+    async saveApiClient(appId, appSecret, clientName = '', isActive = true, webhookUrl = '') {
         if (!appId || !appSecret) return false;
         const cleanId = String(appId).trim();
         const cleanSecret = String(appSecret).trim();
         const cleanName = String(clientName || cleanId).trim();
+        const cleanWebhook = String(webhookUrl || '').trim();
         const activeBool = Boolean(isActive);
         const now = Date.now();
         let success = false;
@@ -1426,14 +1441,15 @@ module.exports = {
         if (isPostgres) {
             try {
                 await pgPool.query(`
-                    INSERT INTO api_clients (app_id, app_secret, client_name, is_active, created_at, updated_at)
-                    VALUES ($1, $2, $3, $4, $5, $5)
+                    INSERT INTO api_clients (app_id, app_secret, client_name, webhook_url, is_active, created_at, updated_at)
+                    VALUES ($1, $2, $3, $4, $5, $6, $6)
                     ON CONFLICT (app_id) DO UPDATE SET
                         app_secret = EXCLUDED.app_secret,
                         client_name = EXCLUDED.client_name,
+                        webhook_url = EXCLUDED.webhook_url,
                         is_active = EXCLUDED.is_active,
                         updated_at = EXCLUDED.updated_at
-                `, [cleanId, cleanSecret, cleanName, activeBool, now]);
+                `, [cleanId, cleanSecret, cleanName, cleanWebhook || null, activeBool, now]);
                 success = true;
             } catch (e) {
                 console.error('[PG SAVE API CLIENT ERROR]:', e.message);
@@ -1441,14 +1457,15 @@ module.exports = {
         } else {
             try {
                 sqliteDb.prepare(`
-                    INSERT INTO api_clients (app_id, app_secret, client_name, is_active, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT INTO api_clients (app_id, app_secret, client_name, webhook_url, is_active, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(app_id) DO UPDATE SET
                         app_secret = excluded.app_secret,
                         client_name = excluded.client_name,
+                        webhook_url = excluded.webhook_url,
                         is_active = excluded.is_active,
                         updated_at = excluded.updated_at
-                `).run(cleanId, cleanSecret, cleanName, activeBool ? 1 : 0, now, now);
+                `).run(cleanId, cleanSecret, cleanName, cleanWebhook || null, activeBool ? 1 : 0, now, now);
                 success = true;
             } catch (e) {}
         }
@@ -1462,6 +1479,8 @@ module.exports = {
                 app_secret: cleanSecret,
                 clientName: cleanName,
                 client_name: cleanName,
+                webhookUrl: cleanWebhook,
+                webhook_url: cleanWebhook,
                 isActive: activeBool,
                 is_active: activeBool
             };
