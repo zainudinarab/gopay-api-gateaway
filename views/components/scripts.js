@@ -305,6 +305,9 @@ function renderScripts() {
                 var claimBtn = (o.status !== 'PAID') 
                     ? '<button onclick="manualClaimOrder(&quot;' + o.qrisId + '&quot;)" class="px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 text-xs font-bold transition-colors">✅ Validasi Manual</button>' 
                     : '';
+                var deleteBtn = (o.status !== 'PAID')
+                    ? '<button onclick="handleOrderDeleteClick(&quot;' + o.qrisId + '&quot;)" class="px-2 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-400 text-xs font-bold transition-colors" title="Hapus Order">🗑️ Hapus</button>'
+                    : '';
                 return '<tr class="hover:bg-slate-800/40 transition-colors border-b border-slate-800/60">' +
                     '<td class="px-4 py-3.5"><strong class="font-mono text-sky-400 font-bold">' + o.qrisId + '</strong></td>' +
                     '<td class="px-4 py-3.5"><span class="tag tag-success">' + (o.appId || 'default') + '</span></td>' +
@@ -316,6 +319,7 @@ function renderScripts() {
                     '<td class="px-4 py-3.5 text-right flex items-center justify-end gap-2">' +
                         '<a href="/qr/' + o.qrisId + '" target="_blank" class="px-2.5 py-1 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 text-sky-400 text-xs font-semibold inline-flex items-center gap-1 transition-colors">🔗 Lihat QR</a>' +
                         claimBtn +
+                        deleteBtn +
                     '</td>' +
                 '</tr>';
             }).join('');
@@ -402,6 +406,59 @@ function renderScripts() {
                 }
             } catch (e) {
                 alert('Error: ' + e.message);
+            }
+        }
+
+        let _targetDeleteOrderQrisId = null;
+
+        function handleOrderDeleteClick(qrisId) {
+            if (!qrisId) return;
+            _targetDeleteOrderQrisId = qrisId;
+
+            const elTitle = document.getElementById('del-modal-title');
+            const elBody = document.getElementById('del-modal-body');
+            const btnExec = document.getElementById('btn-do-delete-merchant');
+
+            if (elTitle) elTitle.innerText = 'Konfirmasi Hapus Order QRIS';
+            if (elBody) {
+                elBody.innerHTML = 'Apakah Anda yakin ingin menghapus Order QRIS ID <code style="color:var(--accent-cyan);">' + qrisId + '</code> secara permanen dari database? Data order yang dihapus tidak dapat dikembalikan.';
+            }
+
+            if (btnExec) {
+                btnExec.innerText = '🗑️ Ya, Hapus Order';
+                btnExec.onclick = executeDeleteOrder;
+            }
+
+            const modal = document.getElementById('modal-confirm-delete');
+            if (modal) modal.style.display = 'flex';
+        }
+
+        async function executeDeleteOrder() {
+            if (!_targetDeleteOrderQrisId) return;
+            const qrisId = _targetDeleteOrderQrisId;
+            closeConfirmDeleteModal();
+
+            try {
+                const pass = adminPass || localStorage.getItem('admin_pass') || sessionStorage.getItem('admin_pass') || 'admin123456';
+                const res = await fetch('/api/orders/' + encodeURIComponent(qrisId) + '?api_key=' + encodeURIComponent(pass), {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': pass
+                    }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert(data.message || 'Order berhasil dihapus!');
+                    loadOrdersTable();
+                    loadWebhooksTable();
+                } else {
+                    alert('Gagal: ' + (data.message || 'Gagal menghapus order'));
+                }
+            } catch (e) {
+                alert('Error: ' + e.message);
+            } finally {
+                _targetDeleteOrderQrisId = null;
             }
         }
 

@@ -97,8 +97,33 @@ const manualClaimOrder = async (req, res) => {
     });
 };
 
+const deleteOrder = async (req, res) => {
+    const qrisId = req.params?.qris_id || req.body?.qris_id || req.query?.qris_id;
+    if (!qrisId) {
+        return res.status(400).json({ success: false, message: 'Param qris_id wajib diisi' });
+    }
+
+    const order = await db.getOrder(qrisId);
+    if (!order) {
+        return res.status(404).json({ success: false, message: 'Order tidak ditemukan' });
+    }
+
+    if (order.status === 'PAID') {
+        return res.status(400).json({ success: false, message: 'Order dengan status PAID (lunas) tidak dapat dihapus!' });
+    }
+
+    const ok = await db.deleteOrder(qrisId);
+    if (ok) {
+        logActivity('INFO', `[DELETE ORDER] Order QRIS ID ${qrisId} berhasil dihapus oleh Admin.`);
+        return res.json({ success: true, message: `Order QRIS ${qrisId} berhasil dihapus!` });
+    } else {
+        return res.status(500).json({ success: false, message: 'Gagal menghapus order dari database' });
+    }
+};
+
 module.exports = {
     getAllOrders,
     clearAllOrders,
-    manualClaimOrder
+    manualClaimOrder,
+    deleteOrder
 };

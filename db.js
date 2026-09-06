@@ -622,6 +622,29 @@ module.exports = {
         }
     },
 
+    async deleteOrder(qrisId) {
+        if (!qrisId) return false;
+        let success = false;
+        if (isPostgres) {
+            try {
+                await pgPool.query(`DELETE FROM webhook_queue WHERE qris_id = $1`, [qrisId]);
+                await pgPool.query(`DELETE FROM qris_orders WHERE qris_id = $1 OR trx_id = $1`, [qrisId]);
+                success = true;
+            } catch (e) {
+                console.error('[PG DELETE ORDER ERROR]:', e.message);
+            }
+        } else {
+            try {
+                sqliteDb.prepare(`DELETE FROM webhook_queue WHERE qris_id = ?`).run(qrisId);
+                sqliteDb.prepare(`DELETE FROM qris_orders WHERE qris_id = ? OR trx_id = ?`).run(qrisId, qrisId);
+                success = true;
+            } catch (e) {
+                console.error('[SQLITE DELETE ORDER ERROR]:', e.message);
+            }
+        }
+        return success;
+    },
+
     async getClaimedTransaction(txId) {
         if (isPostgres) {
             try {

@@ -30,6 +30,7 @@ router.delete('/orders/clear', apiKeyAuth, orderController.clearAllOrders);
 router.post('/orders/clear', apiKeyAuth, orderController.clearAllOrders);
 router.delete('/orders/reset', apiKeyAuth, orderController.clearAllOrders);
 router.post('/orders/reset', apiKeyAuth, orderController.clearAllOrders);
+router.delete('/orders/:qris_id', apiKeyAuth, orderController.deleteOrder);
 router.post('/orders/manual-claim', apiKeyAuth, orderController.manualClaimOrder);
 
 // Transaction & Payment Verification Endpoints
